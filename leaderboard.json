@@ -1,0 +1,354 @@
+{
+ "Acting / Role-fit": [
+  {
+   "rank": 1,
+   "model": "google/gemini-3.1-pro-preview",
+   "license": "proprietary",
+   "score": 0.2049
+  },
+  {
+   "rank": 2,
+   "model": "google/gemini-2.5-pro",
+   "license": "proprietary",
+   "score": 0.1764
+  },
+  {
+   "rank": 3,
+   "model": "google/gemini-3.1-flash-lite",
+   "license": "proprietary",
+   "score": 0.1382
+  },
+  {
+   "rank": 4,
+   "model": "google/gemini-2.5-flash",
+   "license": "proprietary",
+   "score": 0.0884
+  },
+  {
+   "rank": 5,
+   "model": "openai/gpt-audio-1.5",
+   "license": "proprietary",
+   "score": 0.0864
+  },
+  {
+   "rank": 6,
+   "model": "moonshotai/kimi-audio-7b-instruct",
+   "license": "open-source",
+   "score": 0.0604
+  },
+  {
+   "rank": 7,
+   "model": "nvidia/nemotron-3-nano-omni",
+   "license": "open-source",
+   "score": 0.0187
+  }
+ ],
+ "Expressiveness": [
+  {
+   "rank": 1,
+   "model": "google/gemini-3.1-flash-lite",
+   "license": "proprietary",
+   "score": 0.5093
+  },
+  {
+   "rank": 2,
+   "model": "google/gemini-3.1-pro-preview",
+   "license": "proprietary",
+   "score": 0.5087
+  },
+  {
+   "rank": 3,
+   "model": "google/gemini-2.5-pro",
+   "license": "proprietary",
+   "score": 0.5028
+  },
+  {
+   "rank": 4,
+   "model": "google/gemini-2.5-flash",
+   "license": "proprietary",
+   "score": 0.4515
+  },
+  {
+   "rank": 5,
+   "model": "openai/gpt-audio-1.5",
+   "license": "proprietary",
+   "score": 0.4089
+  },
+  {
+   "rank": 6,
+   "model": "nvidia/nemotron-3-nano-omni",
+   "license": "open-source",
+   "score": 0.401
+  },
+  {
+   "rank": 7,
+   "model": "moonshotai/kimi-audio-7b-instruct",
+   "license": "open-source",
+   "score": 0.3876
+  }
+ ],
+ "Voice identity": [
+  {
+   "rank": 1,
+   "model": "google/gemini-3.1-pro-preview",
+   "license": "proprietary",
+   "score": 0.3487
+  },
+  {
+   "rank": 2,
+   "model": "google/gemini-3.1-flash-lite",
+   "license": "proprietary",
+   "score": 0.2058
+  },
+  {
+   "rank": 3,
+   "model": "nvidia/nemotron-3-nano-omni",
+   "license": "open-source",
+   "score": 0.0638
+  },
+  {
+   "rank": 4,
+   "model": "moonshotai/kimi-audio-7b-instruct",
+   "license": "open-source",
+   "score": 0.051
+  },
+  {
+   "rank": 5,
+   "model": "google/gemini-2.5-pro",
+   "license": "proprietary",
+   "score": 0.0367
+  },
+  {
+   "rank": 6,
+   "model": "google/gemini-2.5-flash",
+   "license": "proprietary",
+   "score": 0.0344
+  },
+  {
+   "rank": 7,
+   "model": "openai/gpt-audio-1.5",
+   "license": "proprietary",
+   "score": 0.0162
+  }
+ ],
+ "Language Stability": [
+  {
+   "rank": 1,
+   "model": "google/gemini-3.1-pro-preview",
+   "license": "proprietary",
+   "score": 0.7033
+  },
+  {
+   "rank": 2,
+   "model": "google/gemini-2.5-pro",
+   "license": "proprietary",
+   "score": 0.6311
+  },
+  {
+   "rank": 3,
+   "model": "google/gemini-3.1-flash-lite",
+   "license": "proprietary",
+   "score": 0.5984
+  },
+  {
+   "rank": 4,
+   "model": "nvidia/nemotron-3-nano-omni",
+   "license": "open-source",
+   "score": 0.5716
+  },
+  {
+   "rank": 5,
+   "model": "openai/gpt-audio-1.5",
+   "license": "proprietary",
+   "score": 0.5275
+  },
+  {
+   "rank": 6,
+   "model": "google/gemini-2.5-flash",
+   "license": "proprietary",
+   "score": 0.5094
+  },
+  {
+   "rank": 7,
+   "model": "moonshotai/kimi-audio-7b-instruct",
+   "license": "open-source",
+   "score": 0.1574
+  }
+ ],
+ "Reliability": [
+  {
+   "rank": 1,
+   "model": "google/gemini-3.1-pro-preview",
+   "license": "proprietary",
+   "score": 0.5004
+  },
+  {
+   "rank": 2,
+   "model": "google/gemini-2.5-pro",
+   "license": "proprietary",
+   "score": 0.4703
+  },
+  {
+   "rank": 3,
+   "model": "google/gemini-3.1-flash-lite",
+   "license": "proprietary",
+   "score": 0.4392
+  },
+  {
+   "rank": 4,
+   "model": "openai/gpt-audio-1.5",
+   "license": "proprietary",
+   "score": 0.4086
+  },
+  {
+   "rank": 5,
+   "model": "google/gemini-2.5-flash",
+   "license": "proprietary",
+   "score": 0.4077
+  },
+  {
+   "rank": 6,
+   "model": "moonshotai/kimi-audio-7b-instruct",
+   "license": "open-source",
+   "score": 0.3262
+  },
+  {
+   "rank": 7,
+   "model": "nvidia/nemotron-3-nano-omni",
+   "license": "open-source",
+   "score": 0.2943
+  }
+ ],
+ "Long-form Speaker Stability": [
+  {
+   "rank": 1,
+   "model": "google/gemini-3.1-pro-preview",
+   "license": "proprietary",
+   "score": 0.3869
+  },
+  {
+   "rank": 2,
+   "model": "moonshotai/kimi-audio-7b-instruct",
+   "license": "open-source",
+   "score": 0.3323
+  },
+  {
+   "rank": 3,
+   "model": "openai/gpt-audio-1.5",
+   "license": "proprietary",
+   "score": 0.273
+  },
+  {
+   "rank": 4,
+   "model": "google/gemini-3.1-flash-lite",
+   "license": "proprietary",
+   "score": 0.2543
+  },
+  {
+   "rank": 5,
+   "model": "google/gemini-2.5-pro",
+   "license": "proprietary",
+   "score": 0.2406
+  },
+  {
+   "rank": 6,
+   "model": "nvidia/nemotron-3-nano-omni",
+   "license": "open-source",
+   "score": 0.2264
+  },
+  {
+   "rank": 7,
+   "model": "google/gemini-2.5-flash",
+   "license": "proprietary",
+   "score": 0.1662
+  }
+ ],
+ "Extended Long-Form Speaker Stability": [
+  {
+   "rank": 1,
+   "model": "google/gemini-3.1-pro-preview",
+   "license": "proprietary",
+   "score": 0.4423
+  },
+  {
+   "rank": 2,
+   "model": "google/gemini-2.5-pro",
+   "license": "proprietary",
+   "score": 0.3217
+  },
+  {
+   "rank": 3,
+   "model": "google/gemini-3.1-flash-lite",
+   "license": "proprietary",
+   "score": 0.2863
+  },
+  {
+   "rank": 4,
+   "model": "google/gemini-2.5-flash",
+   "license": "proprietary",
+   "score": 0.1933
+  },
+  {
+   "rank": 5,
+   "model": "moonshotai/kimi-audio-7b-instruct",
+   "license": "open-source",
+   "score": 0.0416
+  },
+  {
+   "rank": 6,
+   "model": "nvidia/nemotron-3-nano-omni",
+   "license": "open-source",
+   "score": 0.0097
+  },
+  {
+   "rank": 7,
+   "model": "openai/gpt-audio-1.5",
+   "license": "proprietary",
+   "score": 0.0
+  }
+ ],
+ "Acoustic Quality": [
+  {
+   "rank": 1,
+   "model": "google/gemini-3.1-pro-preview",
+   "license": "proprietary",
+   "score": 0.3821
+  },
+  {
+   "rank": 2,
+   "model": "google/gemini-2.5-pro",
+   "license": "proprietary",
+   "score": 0.3797
+  },
+  {
+   "rank": 3,
+   "model": "google/gemini-3.1-flash-lite",
+   "license": "proprietary",
+   "score": 0.3552
+  },
+  {
+   "rank": 4,
+   "model": "google/gemini-2.5-flash",
+   "license": "proprietary",
+   "score": 0.3477
+  },
+  {
+   "rank": 5,
+   "model": "nvidia/nemotron-3-nano-omni",
+   "license": "open-source",
+   "score": 0.1991
+  },
+  {
+   "rank": 6,
+   "model": "openai/gpt-audio-1.5",
+   "license": "proprietary",
+   "score": 0.0989
+  },
+  {
+   "rank": 7,
+   "model": "moonshotai/kimi-audio-7b-instruct",
+   "license": "open-source",
+   "score": 0.0833
+  }
+ ]
+}
