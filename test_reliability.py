@@ -18,7 +18,7 @@ sys.path.insert(0, HERE)
 
 from reliability import (  # noqa: E402
     analyse, ceiling, disattenuate, icc_one_way, icc_two_way_consistency,
-    pearson, spearman_brown, substitution_ratio, turns_needed)
+    load_csv, pearson, spearman_brown, substitution_ratio, turns_needed)
 from simulate import (  # noqa: E402
     make_judge, make_ratings, to_by_item, to_triples)
 
@@ -216,6 +216,88 @@ def test_degenerate_designs_return_none_not_a_number():
     assert icc_one_way({"a": [1.0]}) is None
     assert icc_one_way({}) is None
     assert icc_two_way_consistency([("a", "r1", 1.0)]) is None
+
+
+# ------------------------------- bugs found by an outside review, now locked
+
+def test_inverted_judge_is_refused():
+    """
+    A judge that ranks quality backwards squares to the same reliability as one
+    that ranks it correctly, because disattenuation squares the correlation.
+    Before this was caught, an inverted judge was approved for automation with
+    an identical ratio -- the worst failure this tool could have.
+    """
+    rows, thetas = make_ratings(n_items=400, k_raters=3, rho_1=0.28, seed=3)
+    by_item = to_by_item(rows)
+    good = make_judge(thetas, rho_judge=0.60, seed=4)
+    inverted = {i: -v for i, v in good.items()}
+
+    r_good = analyse(by_item, judge=good, resamples=200)
+    r_bad = analyse(by_item, judge=inverted, resamples=200)
+
+    assert r_good["automatable"], "a good judge should still clear the gate"
+    assert abs(r_bad["observed_r"] + r_good["observed_r"]) < 1e-9, "not a mirror"
+    assert not r_bad["automatable"], "an inverted judge was approved"
+    assert r_bad["ratio"] == 0.0, f"inverted judge given credit: {r_bad['ratio']}"
+    assert "negatively correlated" in r_bad["refusal_reason"]
+
+
+def test_rater_identity_survives_the_csv_path():
+    """
+    The proposal asks for rows with rater identity preserved. A loader that
+    drops the rater id at the door makes the two-way model unreachable -- the
+    same mistake the method warns about, in the tool itself.
+    """
+    import os
+    import tempfile
+    from simulate import write_csv
+
+    rows, _ = make_ratings(n_items=120, k_raters=3, rho_1=0.45,
+                           rater_bias=0.8, seed=2, crossed=True)
+    path = os.path.join(tempfile.mkdtemp(), "r.csv")
+    write_csv(rows, path)
+    try:
+        data = load_csv(path)
+        assert set(data) == {"demo"}
+        by_item, triples = data["demo"]
+        assert len(triples) == len(rows), "rows lost"
+        assert len({r for _, r, _ in triples}) == 3, "rater identity lost"
+
+        out = analyse(by_item, rows=triples, resamples=1)
+        assert "rho_1_consistency" in out, "two-way never ran from the CSV path"
+        # with strong bias the one-way estimate is badly deflated; the two-way
+        # one is not. That gap is the reason rater identity has to survive.
+        assert out["rho_1_consistency"] > out["rho_1"] + 0.15
+    finally:
+        os.remove(path)
+
+
+def test_load_csv_rejects_missing_columns():
+    import os
+    import tempfile
+    path = os.path.join(tempfile.mkdtemp(), "bad.csv")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("item_id,dimension,score" + chr(10) + "i1,d,3" + chr(10))
+    try:
+        try:
+            load_csv(path)
+        except ValueError as e:
+            assert "rater_id" in str(e)
+        else:
+            raise AssertionError("a CSV without rater_id was accepted")
+    finally:
+        os.remove(path)
+
+
+def test_planning_figure_is_not_falsely_precise():
+    """
+    A tool that refuses to quote a precise saving must not quote a precise
+    sample size either. The figure is rounded to two significant digits.
+    """
+    n = turns_needed(28, 0.20)
+    assert n is not None
+    assert n % (10 ** max(0, len(str(n)) - 2)) == 0, f"looks over-precise: {n}"
+    assert turns_needed(100, 0.5) > turns_needed(100, 0.9), "not monotone"
 
 
 # ------------------------------------------------------------ runner

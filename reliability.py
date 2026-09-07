@@ -159,6 +159,12 @@ def disattenuate(observed_r, rho_yardstick):
     """
     Correct a judge's observed correlation for the noise in what it was
     scored against. Without this every judge is understated.
+
+    Returns a reliability, which is a squared quantity and therefore never
+    negative. THE SIGN IS LOST HERE ON PURPOSE, and callers must check it
+    separately: a judge that ranks quality backwards produces the same
+    reliability as one that ranks it correctly. Using this figure without
+    looking at the sign of `observed_r` would approve an inverted judge.
     """
     if rho_yardstick <= 0:
         return None
@@ -194,10 +200,17 @@ def pearson(xs, ys):
 # ---------------------------------------------------------------------------
 # One dimension, end to end
 # ---------------------------------------------------------------------------
-def analyse(by_item, judge=None, resamples=BOOTSTRAP_RESAMPLES, seed=0):
+def analyse(by_item, judge=None, resamples=BOOTSTRAP_RESAMPLES, seed=0,
+            rows=None):
     """
-    by_item : {item_id: [score, ...]}   ratings, rater identity preserved
+    by_item : {item_id: [score, ...]}   ratings grouped by item
     judge   : {item_id: score}          optional judge scores on the same items
+    rows    : [(item, rater, score)]    the SAME ratings with rater identity
+                                        kept. Supply this and the two-way model
+                                        runs as well, separating rater bias
+                                        from residual noise -- which is the
+                                        whole reason the proposal asks for
+                                        rater-level rows in the first place.
 
     Bootstrap resamples ITEMS, not ratings -- the ratings of one item are not
     independent of each other, so resampling them would understate the width.
@@ -212,14 +225,34 @@ def analyse(by_item, judge=None, resamples=BOOTSTRAP_RESAMPLES, seed=0):
     out = {"n_items": len(by_item), "k": k, "rho_1": rho_1, "rho_k": rho_k,
            "ceiling": ceiling(rho_k)}
 
+    # Two-way, when the design allows it. It refuses unless fully crossed, so
+    # None here means "the design cannot support it", not "it failed".
+    if rows:
+        two = icc_two_way_consistency(rows)
+        if two:
+            out.update(rho_1_consistency=two[0], var_item=two[1],
+                       var_rater=two[2], var_resid=two[3],
+                       n_raters=len({r for _, r, _ in rows}))
+        else:
+            out["two_way"] = None
+            out["two_way_reason"] = ("design is not fully crossed - every rater "
+                                     "must rate every item exactly once")
+
     if judge:
         shared = [i for i in by_item if i in judge]
         panel = [sum(by_item[i]) / len(by_item[i]) for i in shared]
         js = [judge[i] for i in shared]
         r = pearson(js, panel)
         rho_g = disattenuate(r, rho_k)
+        # A judge that ranks quality backwards squares to the same reliability
+        # as one that ranks it correctly. Carrying signal in the wrong
+        # direction is not the same as being usable, and silently flipping it
+        # is a decision nobody should make on the tool's behalf.
+        inverted = r < 0
         out.update(observed_r=r, rho_judge=rho_g, n_shared=len(shared),
-                   ratio=substitution_ratio(rho_g, rho_1) if rho_g else 0.0)
+                   inverted=inverted,
+                   ratio=0.0 if inverted or not rho_g
+                   else substitution_ratio(rho_g, rho_1))
 
     rng = random.Random(seed)
     items = list(by_item)
@@ -239,9 +272,11 @@ def analyse(by_item, judge=None, resamples=BOOTSTRAP_RESAMPLES, seed=0):
             if len(sh) >= 2:
                 p = [sum(rs[key]) / len(rs[key]) for key in sh]
                 j = [judge[i] for i, _ in sh]
-                g = disattenuate(pearson(j, p), bk)
+                r_b = pearson(j, p)
+                g = disattenuate(r_b, bk)
                 if g is not None:
-                    ratios.append(substitution_ratio(g, b1))
+                    ratios.append(0.0 if r_b < 0
+                                  else substitution_ratio(g, b1))
 
     def pct(vals, q):
         if not vals:
@@ -260,9 +295,13 @@ def analyse(by_item, judge=None, resamples=BOOTSTRAP_RESAMPLES, seed=0):
         # be exactly the number this method exists to delete.
         lo, hi = out["ratio_lo"], out["ratio_hi"]
         out["identified"] = bool(hi is not None and math.isfinite(hi))
-        out["automatable"] = bool(lo and lo > 1.0 and out["identified"])
+        out["automatable"] = bool(lo and lo > 1.0 and out["identified"]
+                                  and not out.get("inverted"))
         out["refusal_reason"] = (
             None if out["automatable"] else
+            "judge is negatively correlated with the panel - it ranks quality "
+            "backwards, and flipping it is a decision for a person, not a tool"
+            if out.get("inverted") else
             "interval unbounded - ratio not identified at this sample size"
             if not out["identified"] else
             "lower bound below 1 - judge not worth one human rating")
@@ -271,46 +310,83 @@ def analyse(by_item, judge=None, resamples=BOOTSTRAP_RESAMPLES, seed=0):
 
 def turns_needed(current_n, rho_lo, target=1.0):
     """
-    When the interval does not clear the threshold, say what would settle it
-    instead of quoting a number. Interval width shrinks roughly as 1/sqrt(n),
-    so this is a scale estimate, not a promise -- and it is reported as such.
+    A PLANNING FIGURE, not a result. Read it as an order of magnitude.
+
+    Derivation and its limits: the half-width of a bootstrap interval shrinks
+    roughly as 1/sqrt(n). If the lower bound must move up by a factor f to
+    clear the threshold, the sample must grow by roughly f squared. That is
+    the whole basis, and it is weak in two ways -- it assumes the point
+    estimate does not move as data arrives, and the 1/sqrt(n) scaling is
+    asymptotic, so it is unreliable at exactly the small n where the question
+    is being asked.
+
+    So the figure is rounded to two significant digits. A tool that refuses to
+    quote a precise saving should not turn round and quote a precise sample
+    size; "roughly this many more" is the honest form.
     """
     if rho_lo is None or rho_lo <= 0 or rho_lo >= target:
         return None
     factor = (target / rho_lo) ** 2
-    return int(math.ceil(current_n * factor)) - current_n
+    need = math.ceil(current_n * factor) - current_n
+    if need <= 0:
+        return None
+    digits = max(0, len(str(need)) - 2)          # two significant digits
+    step = 10 ** digits
+    return int(math.ceil(need / step) * step)
 
 
 # ---------------------------------------------------------------------------
 # I/O
 # ---------------------------------------------------------------------------
 def load_csv(path):
-    """item_id, rater_id, dimension, score  ->  {dimension: {item: [scores]}}"""
-    dims = defaultdict(lambda: defaultdict(list))
+    """
+    item_id, rater_id, dimension, score
+
+    Returns {dimension: (by_item, rows)} -- BOTH groupings. The rater id is
+    carried through rather than dropped at the door: without it the two-way
+    model cannot run, and asking for rater-level rows and then discarding them
+    would be the same mistake this whole method warns about.
+    """
+    by_item = defaultdict(lambda: defaultdict(list))
+    triples = defaultdict(list)
     with io.open(path, encoding="utf-8", newline="") as f:
-        for row in csv.DictReader(f):
-            dims[row["dimension"]][row["item_id"]].append(float(row["score"]))
-    return {d: dict(v) for d, v in dims.items()}
+        reader = csv.DictReader(f)
+        missing = {"item_id", "rater_id", "dimension", "score"} - set(reader.fieldnames or [])
+        if missing:
+            raise ValueError(f"CSV is missing required column(s): {sorted(missing)}")
+        for row in reader:
+            d, i, r = row["dimension"], row["item_id"], row["rater_id"]
+            x = float(row["score"])
+            by_item[d][i].append(x)
+            triples[d].append((i, r, x))
+    return {d: (dict(by_item[d]), triples[d]) for d in by_item}
 
 
 def report(table):
     print(f"{'dimension':24s}{'items':>7s}{'k':>5s}{'rho_1':>9s}"
-          f"{'95% interval':>20s}{'rho_k':>8s}{'ceiling':>9s}")
-    print("-" * 82)
+          f"{'95% interval':>20s}{'rho_k':>8s}{'ceiling':>9s}{'two-way':>10s}")
+    print("-" * 92)
     for name, r in table.items():
         if r is None:
             print(f"{name:24s}   not computable from this design")
             continue
         iv = (f"[{r['rho_1_lo']:.3f}, {r['rho_1_hi']:.3f}]"
               if r["rho_1_lo"] is not None else "-")
+        tw = (f"{r['rho_1_consistency']:10.4f}" if "rho_1_consistency" in r
+              else f"{'-':>10s}")
         print(f"{name:24s}{r['n_items']:7d}{r['k']:5.1f}{r['rho_1']:9.4f}"
-              f"{iv:>20s}{r['rho_k']:8.4f}{r['ceiling']:9.4f}")
+              f"{iv:>20s}{r['rho_k']:8.4f}{r['ceiling']:9.4f}{tw}")
+    if any("rho_1_consistency" not in (r or {}) for r in table.values()):
+        print()
+        print("two-way column blank: design not fully crossed, so rater")
+        print("bias cannot be separated from residual noise.")
+        print("cannot be separated from residual noise. One-way absorbs it.")
 
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         data = load_csv(sys.argv[1])
-        report({d: analyse(v) for d, v in data.items()})
+        report({d: analyse(bi, rows=rw) for d, (bi, rw) in data.items()})
     else:
         from simulate import demo
         demo()
