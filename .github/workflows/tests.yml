@@ -1,0 +1,55 @@
+name: tests
+# The repository defends its own numbers. Three things run on every push:
+#   1. the mathematics is checked against a worked example before it is
+#      pointed at any real data;
+#   2. the estimator must recover a reliability it was not told, from
+#      simulated rows where the answer is known by construction;
+#   3. the saved leaderboard must still match the live public page, so the
+#      committed JSON is a reproducible claim rather than a copy-paste.
+#
+# No third-party dependencies. Standard library only.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "17 6 * * 1"      # weekly: catch upstream numbers changing
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Mathematics self-checks
+        run: python ceiling_bounds.py --self-test
+
+      - name: Bounds and data integrity (15 tests)
+        run: python test_ceiling.py
+
+      - name: Estimator recovery and methodological traps (13 tests)
+        run: python test_reliability.py
+
+      - name: Reports run end to end
+        run: |
+          python ceiling_bounds.py > /dev/null
+          python chart.py > /dev/null
+          python simulate.py > /dev/null
+
+  live-data:
+    # Separated: a change in the upstream page is news, not a broken build.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Saved numbers still match the live leaderboard
+        run: python fetch_leaderboard.py --check
