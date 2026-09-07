@@ -8,6 +8,31 @@ which is the only place the estimator itself can be validated.
 That is the point of this file: before the pipeline is pointed at anyone's
 data, it has to recover a reliability it was not told.
 
+WHAT THIS CANNOT DO, stated plainly. The rows are generated from exactly the
+model the estimator assumes: one true score per item, plus independent
+Gaussian error with a single variance. So the check is circular in one
+specific way -- it can confirm the arithmetic, and it can never reveal that
+the model is wrong for real ratings.
+
+Real ratings depart from it in at least three ways, and two are measured in
+the test suite rather than left as caveats:
+
+    five-point scale     the model assumes a continuum; rounding costs
+                         about 5% of the estimate at rho_1 = 0.45 and
+                         about 11% at 0.70
+
+    unequal rater noise  the model assumes one error variance; a realistic
+                         spread of careful and careless raters costs about
+                         a fifth of the estimate
+
+    heavy-tailed error   if the error variance is not finite, reliability is
+                         not defined at all, and no estimator can help
+
+All the measured departures bias the estimate DOWNWARD, which is the safe
+direction: understating reliability overstates how many raters are needed.
+None of them touches the rho_1 >= r^2 bound, which comes from the published
+correlations rather than from this estimator.
+
 Usage:
     python simulate.py        # generate rows and check recovery
 """
@@ -19,7 +44,7 @@ import random
 
 
 def make_ratings(n_items=300, k_raters=3, rho_1=0.45, rater_bias=0.0,
-                 scale=None, seed=0, crossed=False):
+                 scale=None, seed=0, crossed=False, noise_spread=0.0):
     """
     Generate ratings whose single-rater reliability is rho_1 by construction.
 
@@ -35,7 +60,11 @@ def make_ratings(n_items=300, k_raters=3, rho_1=0.45, rater_bias=0.0,
     made generatable so it can be measured.
 
     scale = (lo, hi) rounds to integers in that range, as a Likert panel
-    would. Rounding costs a little reliability; the tests allow for it.
+    would. Rounding costs a little reliability; the tests measure how much.
+
+    noise_spread makes raters differ in how noisy they are -- one careful, one
+    average, one careless. Real panels are like this and the model is not: it
+    assumes a single error variance. The tests measure the cost of that too.
 
     Returns (rows, thetas) -- the true scores are returned so a judge can be
     built from them rather than from the panel.
@@ -49,12 +78,15 @@ def make_ratings(n_items=300, k_raters=3, rho_1=0.45, rater_bias=0.0,
     bias = {f"r{j}": rng.gauss(0, rater_bias) for j in range(pool)}
     raters = list(bias)
 
+    # Per-rater noise scale. 1.0 for everyone unless noise_spread is set.
+    spread = {r: math.exp(rng.gauss(0, noise_spread)) for r in raters}
+
     rows, thetas = [], {}
     for i in range(n_items):
         theta = rng.gauss(0, 1)
         thetas[f"i{i}"] = theta
         for r in (raters if crossed else rng.sample(raters, k_raters)):
-            x = theta + rng.gauss(0, sigma) + bias[r]
+            x = theta + rng.gauss(0, sigma * spread[r]) + bias[r]
             if scale:
                 lo, hi = scale
                 x = min(max(round(x * (hi - lo) / 6 + (lo + hi) / 2), lo), hi)

@@ -218,6 +218,45 @@ def test_degenerate_designs_return_none_not_a_number():
     assert icc_two_way_consistency([("a", "r1", 1.0)]) is None
 
 
+# ------------------------- what the simulation CANNOT validate, measured
+
+def test_likert_rounding_biases_downward_and_by_how_much():
+    """
+    The ground truth here is synthetic, and it is generated from exactly the
+    model the estimator assumes. That validates the arithmetic; it cannot
+    validate the model.
+
+    So measure the cost of one real departure: actual panels rate on a
+    five-point scale, and the model assumes a continuum. Rounding must bias the
+    estimate DOWNWARD -- which is the safe direction, because understating
+    reliability overstates how many raters are needed.
+    """
+    for built in (0.45, 0.70):
+        smooth, _ = make_ratings(n_items=800, k_raters=3, rho_1=built, seed=11)
+        rounded, _ = make_ratings(n_items=800, k_raters=3, rho_1=built,
+                                  seed=11, scale=(1, 5))
+        a = icc_one_way(to_by_item(smooth))[0]
+        b = icc_one_way(to_by_item(rounded))[0]
+        assert b < a, f"rounding should cost reliability at {built}"
+        assert (a - b) / a < 0.20, f"rounding cost more than 20% at {built}"
+
+
+def test_unequal_rater_noise_biases_downward():
+    """
+    Real panels contain careful and careless raters. The model assumes one
+    error variance for everyone. Measured cost: roughly a fifth of the estimate
+    at a realistic spread -- again downward, again the safe direction, and
+    large enough that it belongs in the assumptions rather than in a footnote.
+    """
+    even, _ = make_ratings(n_items=800, k_raters=3, rho_1=0.45, seed=5)
+    uneven, _ = make_ratings(n_items=800, k_raters=3, rho_1=0.45, seed=5,
+                             noise_spread=0.6)
+    a = icc_one_way(to_by_item(even))[0]
+    b = icc_one_way(to_by_item(uneven))[0]
+    assert b < a, "unequal rater noise should lower the estimate"
+    assert (a - b) / a < 0.40, "cost larger than expected; investigate"
+
+
 # ------------------------------- bugs found by an outside review, now locked
 
 def test_inverted_judge_is_refused():
