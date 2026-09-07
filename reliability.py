@@ -87,8 +87,19 @@ def icc_two_way_consistency(rows):
     untouched. That is why removing bias is not the same as measuring
     reliability.
 
-    Needs raters that repeat across items. rows: [(item, rater, score), ...].
-    Returns (rho_1, s2_item, s2_rater, s2_resid) or None.
+    Requires a FULLY CROSSED, BALANCED design: every rater rates every item,
+    exactly once. The sums of squares only decompose orthogonally in that case.
+    On an unbalanced design the item and rater effects are correlated, the
+    residual is deflated, and the estimate can be badly wrong -- measured at
+    +0.30 on data built at 0.45 with strong rater bias.
+
+    So this function refuses rather than approximates. That is the same rule
+    the substitution gate follows: when the design cannot support the estimate,
+    say so instead of returning a number.
+
+    rows: [(item, rater, score), ...].
+    Returns (rho_1, s2_item, s2_rater, s2_resid), or None if the design is not
+    crossed and balanced.
     """
     items = sorted({i for i, _, _ in rows})
     raters = sorted({r for _, r, _ in rows})
@@ -98,13 +109,18 @@ def icc_two_way_consistency(rows):
     ii = {v: a for a, v in enumerate(items)}
     ri = {v: a for a, v in enumerate(raters)}
 
+    # Refuse anything that is not fully crossed and balanced.
+    if len(rows) != n * k:
+        return None
+    seen = {(i, r) for i, r, _ in rows}
+    if len(seen) != n * k:
+        return None                      # a duplicate or a missing cell
+
     grand = sum(x for _, _, x in rows) / len(rows)
     im, rm = defaultdict(list), defaultdict(list)
     for i, r, x in rows:
         im[ii[i]].append(x)
         rm[ri[r]].append(x)
-    if any(len(v) < 2 for v in rm.values()):
-        return None
 
     msb = sum(len(v) * (sum(v) / len(v) - grand) ** 2 for v in im.values()) / (n - 1)
     msr = sum(len(v) * (sum(v) / len(v) - grand) ** 2 for v in rm.values()) / (k - 1)

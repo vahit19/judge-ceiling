@@ -32,7 +32,7 @@ jobs:
       - name: Bounds and data integrity (15 tests)
         run: python test_ceiling.py
 
-      - name: Estimator recovery and methodological traps (13 tests)
+      - name: Estimator recovery and methodological traps (16 tests)
         run: python test_reliability.py
 
       - name: Reports run end to end

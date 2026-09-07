@@ -52,6 +52,67 @@ def test_spearman_brown_matches_icc_k():
 
 # ----------------------------------------------------- bias is not noise
 
+def test_two_way_matches_hand_computation():
+    """
+    Balanced 6x3 design, ICC(3,1) computed independently from the standard
+    two-way ANOVA identities. The implementation must land on it exactly.
+    """
+    data = [("i1", "A", 9), ("i1", "B", 2), ("i1", "C", 5),
+            ("i2", "A", 6), ("i2", "B", 1), ("i2", "C", 3),
+            ("i3", "A", 8), ("i3", "B", 4), ("i3", "C", 6),
+            ("i4", "A", 7), ("i4", "B", 1), ("i4", "C", 2),
+            ("i5", "A", 10), ("i5", "B", 5), ("i5", "C", 6),
+            ("i6", "A", 6), ("i6", "B", 2), ("i6", "C", 4)]
+    n, k = 6, 3
+    xs = [x for _, _, x in data]
+    grand = sum(xs) / len(xs)
+    im, rm = {}, {}
+    for i, r, x in data:
+        im.setdefault(i, []).append(x)
+        rm.setdefault(r, []).append(x)
+    msr = k * sum((sum(v) / len(v) - grand) ** 2 for v in im.values()) / (n - 1)
+    ssr = k * sum((sum(v) / len(v) - grand) ** 2 for v in im.values())
+    ssc = n * sum((sum(v) / len(v) - grand) ** 2 for v in rm.values())
+    sst = sum((x - grand) ** 2 for x in xs)
+    mse = (sst - ssr - ssc) / ((n - 1) * (k - 1))
+    expected = (msr - mse) / (msr + (k - 1) * mse)
+    assert abs(icc_two_way_consistency(data)[0] - expected) < 1e-12
+
+
+def test_two_way_refuses_unbalanced_designs():
+    """
+    The sums of squares only decompose orthogonally when every rater rates
+    every item. On an unbalanced design the estimate was measured at +0.30 on
+    data built at 0.45. The function must refuse rather than approximate.
+    """
+    rows, _ = make_ratings(n_items=200, k_raters=3, rho_1=0.45, seed=1)  # pooled
+    assert icc_two_way_consistency(to_triples(rows)) is None
+
+    crossed, _ = make_ratings(n_items=200, k_raters=3, rho_1=0.45,
+                              seed=1, crossed=True)
+    assert icc_two_way_consistency(to_triples(crossed)) is not None
+
+    # a single missing cell is enough to disqualify it
+    holed = to_triples(crossed)[:-1]
+    assert icc_two_way_consistency(holed) is None
+
+
+def test_residual_is_invariant_to_rater_bias():
+    """
+    The sharpest form of "bias is not noise": on a crossed design the residual
+    variance must be identical whatever the rater offsets are.
+    """
+    resids, rhos = [], []
+    for bias in (0.0, 0.5, 1.0):
+        rows, _ = make_ratings(n_items=300, k_raters=3, rho_1=0.45,
+                               rater_bias=bias, seed=7, crossed=True)
+        rho, _si, _sr, resid = icc_two_way_consistency(to_triples(rows))
+        resids.append(resid)
+        rhos.append(rho)
+    assert max(resids) - min(resids) < 1e-9, f"residual moved: {resids}"
+    assert max(rhos) - min(rhos) < 1e-9, f"reliability moved: {rhos}"
+
+
 def test_two_way_separates_bias_from_noise():
     """
     The claim the whole proposal rests on, made testable.
@@ -63,7 +124,7 @@ def test_two_way_separates_bias_from_noise():
     one_way, two_way, resid = [], [], []
     for bias in (0.0, 0.5, 1.0):
         rows, _ = make_ratings(n_items=500, k_raters=3, rho_1=0.45,
-                               rater_bias=bias, seed=7)
+                               rater_bias=bias, seed=7, crossed=True)
         one_way.append(icc_one_way(to_by_item(rows))[0])
         rho, _s_item, s_rater, s_resid = icc_two_way_consistency(to_triples(rows))
         two_way.append(rho)
@@ -71,7 +132,7 @@ def test_two_way_separates_bias_from_noise():
 
     assert one_way[0] > one_way[-1] + 0.03, "one-way should absorb bias as error"
     assert all(abs(r - 0.45) < 0.07 for r in two_way), f"two-way drifted: {two_way}"
-    assert abs(resid[0] - resid[-1]) / resid[0] < 0.15, "residual should be stable"
+    assert abs(resid[0] - resid[-1]) / resid[0] < 1e-9, "residual must be identical"
 
 
 # ------------------------------------------------------- ceiling and judge

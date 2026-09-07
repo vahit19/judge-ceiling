@@ -19,7 +19,7 @@ import random
 
 
 def make_ratings(n_items=300, k_raters=3, rho_1=0.45, rater_bias=0.0,
-                 scale=None, seed=0):
+                 scale=None, seed=0, crossed=False):
     """
     Generate ratings whose single-rater reliability is rho_1 by construction.
 
@@ -42,14 +42,18 @@ def make_ratings(n_items=300, k_raters=3, rho_1=0.45, rater_bias=0.0,
     """
     rng = random.Random(seed)
     sigma = math.sqrt(1.0 / rho_1 - 1.0)
-    bias = {f"r{j}": rng.gauss(0, rater_bias) for j in range(max(k_raters * 4, 8))}
+    # crossed=True gives every rater every item -- the balanced design the
+    # two-way model requires. Otherwise raters are drawn from a larger pool,
+    # which is what a real panel looks like and what the one-way model handles.
+    pool = k_raters if crossed else max(k_raters * 4, 8)
+    bias = {f"r{j}": rng.gauss(0, rater_bias) for j in range(pool)}
     raters = list(bias)
 
     rows, thetas = [], {}
     for i in range(n_items):
         theta = rng.gauss(0, 1)
         thetas[f"i{i}"] = theta
-        for r in rng.sample(raters, k_raters):
+        for r in (raters if crossed else rng.sample(raters, k_raters)):
             x = theta + rng.gauss(0, sigma) + bias[r]
             if scale:
                 lo, hi = scale
@@ -111,14 +115,15 @@ def demo():
     print("=" * 78)
     print("2) BIAS IS NOT NOISE -- and only a two-way model can tell them apart")
     print("=" * 78)
-    print("Ratings built at rho_1 = 0.45 throughout. Only the rater offsets change.")
+    print("Ratings built at rho_1 = 0.45 throughout, fully crossed design.")
+    print("Only the rater offsets change.")
     print()
     print(f"{'rater bias sd':>14s}{'one-way':>10s}{'two-way':>10s}"
           f"{'s2_rater':>11s}{'s2_resid':>11s}")
     print("-" * 78)
     for bias in (0.0, 0.5, 1.0):
         rows, _ = make_ratings(n_items=400, k_raters=3, rho_1=0.45,
-                               rater_bias=bias, seed=7)
+                               rater_bias=bias, seed=7, crossed=True)
         one = analyse(to_by_item(rows), resamples=1)["rho_1"]
         two = icc_two_way_consistency(to_triples(rows))
         print(f"{bias:14.1f}{one:10.4f}{two[0]:10.4f}{two[2]:11.4f}{two[3]:11.4f}")
