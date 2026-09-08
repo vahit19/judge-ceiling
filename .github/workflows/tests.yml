@@ -32,14 +32,27 @@ jobs:
       - name: Bounds and data integrity (15 tests)
         run: python test_ceiling.py
 
-      - name: Estimator recovery and methodological traps (22 tests)
+      - name: Estimator recovery and methodological traps (35 tests)
         run: python test_reliability.py
+
+      - name: Rating store refusals and provenance (11 tests)
+        run: python test_store.py
 
       - name: Reports run end to end
         run: |
           python ceiling_bounds.py > /dev/null
           python chart.py > /dev/null
           python simulate.py > /dev/null
+          python simulate.py --departures > /dev/null
+          python reliability.py --matrix 0.2504 > /dev/null
+
+      - name: Store round trip from a CSV to a report
+        run: |
+          python -c "from simulate import make_ratings, write_csv;             rows, _ = make_ratings(n_items=60, k_raters=3, rho_1=0.45, seed=1, crossed=True);             write_csv(rows, 'ci.csv')"
+          python store.py --db ci.db ingest ci.csv --rubric v1
+          python store.py --db ci.db ingest ci.csv --rubric v1   # idempotent
+          python store.py --db ci.db sources
+          python store.py --db ci.db analyse > /dev/null
 
   live-data:
     # Separated: a change in the upstream page is news, not a broken build.

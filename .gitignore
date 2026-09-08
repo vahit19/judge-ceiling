@@ -8,3 +8,5 @@ __pycache__/
 *.key
 *.pem
 credentials.json
+*.db
+ci.csv

@@ -28,9 +28,15 @@ python reliability.py --budget 0.2504   # what each panel size buys
 python reliability.py --matrix 0.2504   # items x raters, to detect an effect
 python reliability.py --turns           # turn vs conversation as the item
 
+# a store, once it is more than one run
+python store.py ingest ratings.csv --rubric v1
+python store.py sources                 # what produced which number
+python store.py analyse --rubric v1
+
 # tests
 python test_ceiling.py         # 15: mathematics + data integrity
 python test_reliability.py     # 35: recovery, traps, and model-violation costs
+python test_store.py           # 11: store refusals and provenance
 python simulate.py --departures         # what leaving the model costs
 ```
 
@@ -197,6 +203,39 @@ Both the numbers above and the reversal are now asserted across seeds.
 None of this touches the `ρ₁ ≥ r²` bound, which comes from published
 correlations rather than from this estimator.
 
+## From a CSV to a store
+
+A CSV is enough to compute a number once. It is not enough to defend that
+number later, and it cannot stop the two failure modes that corrupt a
+reliability estimate without ever looking wrong:
+
+**Rubric drift.** Scores given under different rubric versions are different
+measurements wearing the same column name. Pool them and the estimator sees
+one item scored by twice as many raters, so it reports a figure that belongs
+to neither scale. Measured on two versions of the same dimension: the pooled
+estimate lands *below both* true values, and the apparent panel size doubles
+— an error that makes the design look stronger while making the result look
+worse. `store.py` refuses to pool unless a rubric is named.
+
+**Provenance.** Every rating carries the SHA-256 of the file it came from, and
+sources are content-addressed, so ingesting the same bytes twice is a no-op
+rather than a duplication. Duplicated rows would tighten an interval the
+design never earned.
+
+```
+$ python store.py analyse
+error: the store holds 2 rubric versions (v1, v2). Pick one with --rubric:
+scores from different rubric versions are not on the same scale.
+```
+
+The store also enforces at the door what the method asks for everywhere else:
+a row without a rater id is rejected on ingest rather than discovered missing
+during an analysis, and one rater cannot hold two scores for the same item
+under the same rubric.
+
+Both traps were already named in the write-up and neither was enforced
+anywhere. Naming a trap is not the same as being unable to fall into it.
+
 ## Four failures, locked as tests
 
 Locked as tests rather than corrected quietly, because each is a way this kind
@@ -245,6 +284,8 @@ reliability.py          the rating-rows pipeline (ICC, ceiling, ratio, bootstrap
 simulate.py             rows with a known answer, so the estimator is checkable
 test_ceiling.py         15 tests, no test framework required
 test_reliability.py     35 tests, including six traps and the robustness costs
+store.py                rating store: rater identity, rubric version, provenance
+test_store.py           11 tests, mostly refusals
 ```
 
 ## Scope: what this is for, and what it is not
