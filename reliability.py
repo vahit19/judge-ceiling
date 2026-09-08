@@ -336,6 +336,78 @@ def turns_needed(current_n, rho_lo, target=1.0):
 
 
 # ---------------------------------------------------------------------------
+# Budget: what a panel size buys, and what running a smaller one costs
+# ---------------------------------------------------------------------------
+def raters_needed(rho_1, target):
+    """
+    Smallest panel size k whose mean reaches `target` reliability.
+
+    Spearman-Brown solved for k:  k = target(1 - rho_1) / (rho_1(1 - target)).
+
+    This is the "Z number of human readers" half of a sampling plan. The other
+    half -- how many items -- is a precision question, not a reliability one,
+    and is answered by the bootstrap interval, not by this function.
+
+    Reliability 1.0 is unreachable at any finite k, so `target` must be below
+    1. That is not a technicality: it is the reason the question has to be
+    posed as "how good is good enough", never as "how many to be certain".
+    """
+    if not 0.0 < rho_1 < 1.0:
+        raise ValueError("rho_1 must be in (0, 1)")
+    if not 0.0 < target < 1.0:
+        raise ValueError("target must be in (0, 1): rho = 1 needs infinitely many raters")
+    if target <= rho_1:
+        return 1
+    return int(math.ceil(target * (1.0 - rho_1) / (rho_1 * (1.0 - target)) - 1e-12))
+
+
+def budget_table(rho_1, ks=(1, 2, 3, 5, 8, 13)):
+    """
+    What each panel size buys -- and, for a smaller panel, what it forgoes.
+
+    Per k: the reliability of the mean, the ceiling it puts on any judge
+    measured against that panel, and `forgone` = 1 - ceiling, the share of the
+    correlation scale that is unreachable however good the judge is, purely
+    because the yardstick is this noisy.
+
+    `forgone` is the number a budget conversation actually needs. Running a
+    smaller panel is a legitimate choice; running one without knowing what it
+    costs is not. This turns "run fewer and you will not reach the impact you
+    want" from an assertion into a figure per row.
+
+    Note what is NOT here: money. Cost per rating is the caller's, and the
+    trade is only decidable once both sides are on the table.
+    """
+    if not 0.0 < rho_1 < 1.0:
+        raise ValueError("rho_1 must be in (0, 1)")
+    out, prev = [], None
+    for k in sorted(set(int(k) for k in ks)):
+        if k < 1:
+            raise ValueError("panel size must be at least 1")
+        rho_k = spearman_brown(rho_1, k)
+        c = ceiling(rho_k)
+        out.append({"k": k, "rho_k": rho_k, "ceiling": c, "forgone": 1.0 - c,
+                    "gain_over_previous": None if prev is None else c - prev})
+        prev = c
+    return out
+
+
+def budget_report(rho_1, ks=(1, 2, 3, 5, 8, 13)):
+    print(f"one rater's reliability rho_1 = {rho_1:.4f}")
+    print()
+    print(f"{'raters':>7s}{'rho_k':>9s}{'ceiling':>9s}{'forgone':>9s}{'gain':>8s}")
+    print("-" * 42)
+    for r in budget_table(rho_1, ks):
+        g = "-" if r["gain_over_previous"] is None else f"{r['gain_over_previous']:.4f}"
+        print(f"{r['k']:7d}{r['rho_k']:9.4f}{r['ceiling']:9.4f}"
+              f"{r['forgone']:9.4f}{g:>8s}")
+    print()
+    print("ceiling: the highest correlation ANY judge can show against a panel")
+    print("of this size. forgone: what a perfect judge still cannot reach,")
+    print("because the yardstick is noisy. gain: what the extra raters bought.")
+
+
+# ---------------------------------------------------------------------------
 # I/O
 # ---------------------------------------------------------------------------
 def load_csv(path):
@@ -379,13 +451,32 @@ def report(table):
     if any("rho_1_consistency" not in (r or {}) for r in table.values()):
         print()
         print("two-way column blank: design not fully crossed, so rater")
-        print("bias cannot be separated from residual noise.")
-        print("cannot be separated from residual noise. One-way absorbs it.")
+        print("bias cannot be separated from residual noise; one-way absorbs it.")
 
+
+USAGE = """usage:
+  python reliability.py                 the worked demo on generated data
+  python reliability.py ratings.csv     item_id, rater_id, dimension, score
+  python reliability.py --budget RHO    what each panel size buys at rho_1=RHO
+  python reliability.py --turns         same rows, turn vs conversation
+"""
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
-        data = load_csv(sys.argv[1])
+    args = sys.argv[1:]
+    if args and args[0] == "--budget":
+        if len(args) < 2:
+            sys.exit(USAGE)
+        try:
+            budget_report(float(args[1]))
+        except ValueError as e:
+            sys.exit(f"error: {e}")
+    elif args and args[0] == "--turns":
+        from simulate import conversation_demo
+        conversation_demo()
+    elif args and args[0] in ("-h", "--help"):
+        print(USAGE)
+    elif args:
+        data = load_csv(args[0])
         report({d: analyse(bi, rows=rw) for d, (bi, rw) in data.items()})
     else:
         from simulate import demo

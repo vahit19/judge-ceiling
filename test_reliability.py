@@ -18,9 +18,11 @@ sys.path.insert(0, HERE)
 
 from reliability import (  # noqa: E402
     analyse, ceiling, disattenuate, icc_one_way, icc_two_way_consistency,
-    load_csv, pearson, spearman_brown, substitution_ratio, turns_needed)
+    budget_table, load_csv, pearson, raters_needed, spearman_brown,
+    substitution_ratio, turns_needed)
 from simulate import (  # noqa: E402
-    make_judge, make_ratings, to_by_item, to_triples)
+    group_by, make_conversation_ratings, make_judge, make_ratings, to_by_item,
+    to_triples)
 
 
 # --------------------------------------------------------------- recovery
@@ -337,6 +339,96 @@ def test_planning_figure_is_not_falsely_precise():
     assert n is not None
     assert n % (10 ** max(0, len(str(n)) - 2)) == 0, f"looks over-precise: {n}"
     assert turns_needed(100, 0.5) > turns_needed(100, 0.9), "not monotone"
+
+
+# ------------------------------------------------- budget: what a panel buys
+
+def test_raters_needed_inverts_spearman_brown():
+    """k must be the SMALLEST panel that clears the target, not merely one."""
+    for rho_1 in (0.10, 0.25, 0.45, 0.70):
+        for target in (0.60, 0.80, 0.90, 0.95):
+            k = raters_needed(rho_1, target)
+            assert spearman_brown(rho_1, k) >= target - 1e-9, (rho_1, target, k)
+            if k > 1:
+                assert spearman_brown(rho_1, k - 1) < target, (
+                    f"rho_1={rho_1} target={target}: k={k} is not minimal")
+
+
+def test_raters_needed_rejects_certainty():
+    """
+    A target of 1.0 needs infinitely many raters. Returning a big number
+    would be worse than refusing: it would look like an answer.
+    """
+    for bad in (1.0, 1.5, 0.0, -0.1):
+        try:
+            raters_needed(0.3, bad)
+            raise AssertionError(f"accepted target={bad}")
+        except ValueError:
+            pass
+    assert raters_needed(0.8, 0.5) == 1, "target already met needs one rater"
+
+
+def test_budget_table_shows_diminishing_returns():
+    """
+    The whole use of this table is the trade, so the trade must be visible:
+    each extra rater buys less than the one before it.
+    """
+    rowsb = budget_table(0.30, ks=(1, 2, 3, 5, 8, 13))
+    assert rowsb[0]["gain_over_previous"] is None
+    gains = [r["gain_over_previous"] for r in rowsb[1:]]
+    assert all(g > 0 for g in gains), "extra raters must not lose ground"
+    per_rater = [g / (rowsb[i + 1]["k"] - rowsb[i]["k"])
+                 for i, g in enumerate(gains)]
+    assert per_rater == sorted(per_rater, reverse=True), (
+        f"not diminishing: {per_rater}")
+
+
+def test_budget_table_matches_hand_computation():
+    """rho_1 = 0.5, k = 3: Spearman-Brown gives 0.75, ceiling sqrt(0.75)."""
+    row = [r for r in budget_table(0.5, ks=(1, 3)) if r["k"] == 3][0]
+    assert abs(row["rho_k"] - 0.75) < 1e-12, row["rho_k"]
+    assert abs(row["ceiling"] - math.sqrt(0.75)) < 1e-12
+    assert abs(row["forgone"] - (1.0 - math.sqrt(0.75))) < 1e-12
+
+
+# ------------------------------------------- the sampling unit is a decision
+
+def test_turn_grouping_overstates_conversation_reliability():
+    """
+    "Did it handle the whole call correctly" is a conversation-level
+    question. Rating turns and calling the turn the item answers a different
+    one -- and answers it HIGHER, because turn-to-turn variation counts as
+    signal there and as error at the call level. Never a safe substitution.
+    """
+    spread, rho_conv, turns = 0.7, 0.30, 8
+    tau2 = spread ** 2
+    sigma2 = 1.0 / rho_conv - 1.0 - tau2
+    built_turn = (1 + tau2) / (1 + tau2 + sigma2)
+
+    by_turn, by_conv = [], []
+    for seed in range(12):
+        rows, _ = make_conversation_ratings(rho_conv=rho_conv, turns=turns,
+                                            turn_spread=spread, seed=seed)
+        by_turn.append(icc_one_way(group_by(rows, "item_id"))[0])
+        by_conv.append(icc_one_way(group_by(rows, "conv_id"))[0])
+        assert by_turn[-1] > by_conv[-1], f"seed {seed}: ordering did not hold"
+
+    mt = sum(by_turn) / len(by_turn)
+    mc = sum(by_conv) / len(by_conv)
+    assert abs(mt - built_turn) < 0.03, f"turn: {mt} vs {built_turn}"
+    assert abs(mc - rho_conv) < 0.03, f"conversation: {mc} vs {rho_conv}"
+
+
+def test_conversation_generator_refuses_impossible_targets():
+    """
+    Turn-to-turn variation alone caps conversation reliability. Asking for
+    more than the cap is a specification error and must not be rounded away.
+    """
+    try:
+        make_conversation_ratings(rho_conv=0.90, turn_spread=0.7)
+        raise AssertionError("accepted a rho_conv above the structural cap")
+    except ValueError as e:
+        assert "caps it at" in str(e), str(e)
 
 
 # ------------------------------------------------------------ runner
