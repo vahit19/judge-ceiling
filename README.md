@@ -288,6 +288,43 @@ store.py                rating store: rater identity, rubric version, provenance
 test_store.py           11 tests, mostly refusals
 ```
 
+## What each number is for
+
+Every figure here exists to inform one decision. Listing them together is the
+quickest way to see what the repository does and does not settle.
+
+| output | the decision it informs |
+|---|---|
+| `rho_1` | whether a dimension is measured well enough at the panel size in use, or whether the rubric is the problem rather than the raters |
+| `rho_k`, `ceiling` | how to read any judge score on that dimension — as a fraction of what is reachable, not as a raw correlation |
+| `rho_g` | what a judge is worth once the noise of the yardstick it was scored against is removed |
+| `k*` with interval | whether one judge rating can stand in for human ratings, and how many — or whether the question is unanswerable at this sample size |
+| `budget_table` | what a smaller panel forgoes, per panel size, so running fewer is a decision rather than an accident |
+| `matrix_table` | how many items, across how many raters, to detect a given improvement |
+| store refusals | whether the rows are fit to compute any of the above at all |
+
+### What it deliberately does not size
+
+**How many ratings it takes to train a judge.** That is a learning-curve
+question — it depends on the model, the task and the rubric, and no amount of
+classical test theory produces it. Claiming otherwise would be the same error
+as quoting a saving from an unbounded interval.
+
+What this machinery *can* size is the **evaluation** of a trained judge: how
+many held-out items are needed to show its disattenuated reliability with a
+stated interval, and — from the ceiling — on which dimensions a useful figure
+is reachable at all. Those two are the checkable half of the question, and
+they are the half that decides whether a trained judge may be used.
+
+One structural fact bears on the same question and is asserted rather than
+assumed: of the seven judges on this board, exactly **two** are open-weight
+(`test_exactly_two_open_weight_judges`). A judge that cannot be fine-tuned
+cannot be the one you train, whatever the sizing says.
+
+**Which scenarios to evaluate.** Covered below: this takes whatever construct
+a rubric defines and reports how well it was measured. A well-estimated
+reliability on the wrong construct is still the wrong construct.
+
 ## Scope: what this is for, and what it is not
 
 The bound and the pipeline answer one question -- how noisy is the yardstick,
