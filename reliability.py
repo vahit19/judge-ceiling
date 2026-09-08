@@ -209,8 +209,8 @@ def analyse(by_item, judge=None, resamples=BOOTSTRAP_RESAMPLES, seed=0,
                                         kept. Supply this and the two-way model
                                         runs as well, separating rater bias
                                         from residual noise -- which is the
-                                        whole reason the proposal asks for
-                                        rater-level rows in the first place.
+                                        whole reason rater-level rows are worth
+                                        keeping in the first place.
 
     Bootstrap resamples ITEMS, not ratings -- the ratings of one item are not
     independent of each other, so resampling them would understate the width.
@@ -370,10 +370,10 @@ def budget_table(rho_1, ks=(1, 2, 3, 5, 8, 13)):
     correlation scale that is unreachable however good the judge is, purely
     because the yardstick is this noisy.
 
-    `forgone` is the number a budget conversation actually needs. Running a
+    `forgone` is the number a budget decision actually needs. Running a
     smaller panel is a legitimate choice; running one without knowing what it
-    costs is not. This turns "run fewer and you will not reach the impact you
-    want" from an assertion into a figure per row.
+    costs is not. The cost of running fewer is stated per row rather than
+    asserted in prose.
 
     Note what is NOT here: money. Cost per rating is the caller's, and the
     trade is only decidable once both sides are on the table.

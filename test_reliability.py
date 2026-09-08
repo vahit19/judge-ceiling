@@ -117,7 +117,7 @@ def test_residual_is_invariant_to_rater_bias():
 
 def test_two_way_separates_bias_from_noise():
     """
-    The claim the whole proposal rests on, made testable.
+    The claim this whole method rests on, made testable.
 
     Rater bias grows; the residual must not, and consistency reliability must
     stay near where it was built. The one-way estimate, which cannot separate
@@ -285,7 +285,7 @@ def test_inverted_judge_is_refused():
 
 def test_rater_identity_survives_the_csv_path():
     """
-    The proposal asks for rows with rater identity preserved. A loader that
+    This pipeline needs rows with rater identity preserved. A loader that
     drops the rater id at the door makes the two-way model unreachable -- the
     same mistake the method warns about, in the tool itself.
     """
