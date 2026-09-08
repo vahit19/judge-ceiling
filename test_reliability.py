@@ -18,11 +18,11 @@ sys.path.insert(0, HERE)
 
 from reliability import (  # noqa: E402
     analyse, ceiling, disattenuate, icc_one_way, icc_two_way_consistency,
-    budget_table, load_csv, pearson, raters_needed, spearman_brown,
-    substitution_ratio, turns_needed)
+    budget_table, items_needed, load_csv, matrix_table, pearson,
+    raters_needed, spearman_brown, substitution_ratio, turns_needed)
 from simulate import (  # noqa: E402
-    group_by, make_conversation_ratings, make_judge, make_ratings, to_by_item,
-    to_triples)
+    departure_costs, group_by, make_conversation_ratings, make_judge,
+    make_ratings, to_by_item, to_triples)
 
 
 # --------------------------------------------------------------- recovery
@@ -232,31 +232,59 @@ def test_likert_rounding_biases_downward_and_by_how_much():
     five-point scale, and the model assumes a continuum. Rounding must bias the
     estimate DOWNWARD -- which is the safe direction, because understating
     reliability overstates how many raters are needed.
+
+    Measured across seeds, not on one. A single draw of this cost spans four
+    to thirteen percent, so any figure quoted from one seed is a draw rather
+    than a result.
     """
-    for built in (0.45, 0.70):
-        smooth, _ = make_ratings(n_items=800, k_raters=3, rho_1=built, seed=11)
-        rounded, _ = make_ratings(n_items=800, k_raters=3, rho_1=built,
-                                  seed=11, scale=(1, 5))
-        a = icc_one_way(to_by_item(smooth))[0]
-        b = icc_one_way(to_by_item(rounded))[0]
-        assert b < a, f"rounding should cost reliability at {built}"
-        assert (a - b) / a < 0.20, f"rounding cost more than 20% at {built}"
+    for built, expected in ((0.45, 0.087), (0.70, 0.121)):
+        d = departure_costs(rho_1=built, seeds=60)["likert"]
+        assert d["lo"] > 0, f"rounding should cost reliability at {built}"
+        assert d["reversed_share"] == 0.0, "rounding should never raise it"
+        assert abs(d["mean"] - expected) < 0.02, (
+            f"documented cost at {built} is {expected:.1%}, "
+            f"measured {d['mean']:.1%}")
 
 
-def test_unequal_rater_noise_biases_downward():
+def test_unequal_rater_noise_costs_more_than_it_looks_and_can_reverse():
     """
     Real panels contain careful and careless raters. The model assumes one
-    error variance for everyone. Measured cost: roughly a fifth of the estimate
-    at a realistic spread -- again downward, again the safe direction, and
-    large enough that it belongs in the assumptions rather than in a footnote.
+    error variance for everyone.
+
+    This test replaces one that asserted the departure is ALWAYS downward,
+    on a single seed. It was green for the wrong reason: the direction
+    reverses on a minority of draws, and seed 3 fails the old assertion
+    outright. A check that passes because of the seed it was given is not a
+    check, so the property being asserted is now the one that is actually
+    true -- downward on average, with a measured minority going the other
+    way, and a cost nearer a third than the fifth first reported.
     """
-    even, _ = make_ratings(n_items=800, k_raters=3, rho_1=0.45, seed=5)
-    uneven, _ = make_ratings(n_items=800, k_raters=3, rho_1=0.45, seed=5,
-                             noise_spread=0.6)
-    a = icc_one_way(to_by_item(even))[0]
-    b = icc_one_way(to_by_item(uneven))[0]
-    assert b < a, "unequal rater noise should lower the estimate"
-    assert (a - b) / a < 0.40, "cost larger than expected; investigate"
+    d = departure_costs(rho_1=0.45, seeds=60)["rater_noise"]
+    assert abs(d["mean"] - 0.306) < 0.03, (
+        f"documented cost is 30.6%, measured {d['mean']:.1%}")
+    assert 0.0 < d["reversed_share"] < 0.25, (
+        "the reversal is real and is a minority; if it vanished or took over, "
+        "the generator changed")
+    assert d["lo"] < 0 < d["hi"], "the spread must straddle zero"
+
+
+def test_the_old_single_seed_check_was_seed_dependent():
+    """
+    The failure that made the test above necessary, locked so it cannot come
+    back quietly: on seed 5 unequal noise lowers the estimate, on seed 3 it
+    raises it. Both are the same departure at the same reliability.
+    """
+    def one(seed):
+        clean, _ = make_ratings(n_items=800, k_raters=3, rho_1=0.45, seed=seed)
+        dirty, _ = make_ratings(n_items=800, k_raters=3, rho_1=0.45, seed=seed,
+                                noise_spread=0.6)
+        return (icc_one_way(to_by_item(clean))[0],
+                icc_one_way(to_by_item(dirty))[0])
+
+    a5, b5 = one(5)
+    a3, b3 = one(3)
+    assert b5 < a5, "seed 5 goes down -- the draw the old assertion was built on"
+    assert b3 > a3, "seed 3 goes up -- the draw that would have failed it"
 
 
 # ------------------------------- bugs found by an outside review, now locked
@@ -429,6 +457,81 @@ def test_conversation_generator_refuses_impossible_targets():
         raise AssertionError("accepted a rho_conv above the structural cap")
     except ValueError as e:
         assert "caps it at" in str(e), str(e)
+
+
+# ------------------------------------- the second axis of a sampling plan
+
+def test_items_needed_matches_a_hand_computation():
+    """
+    At perfect reliability the attenuation term disappears and the formula
+    reduces to the textbook two-sample size. Checked against a hand value so
+    the power arithmetic is pinned independently of the reliability part.
+    """
+    n = items_needed(effect_sd=0.50, rho_1=0.999999, k=1)
+    hand = 2 * ((1.959964 + 0.841621) / 0.50) ** 2      # 62.8 -> 63
+    assert abs(n - math.ceil(hand)) <= 1, (n, hand)
+
+
+def test_more_raters_reduce_the_items_needed():
+    """
+    The two axes are not independent, and this is the direction that makes a
+    matrix worth printing: a better yardstick buys back items.
+    """
+    ns = [items_needed(0.20, rho_1=0.2504, k=k) for k in (1, 3, 5, 8, 13)]
+    assert ns == sorted(ns, reverse=True), ns
+    assert ns[0] > 2 * ns[-1], "extra raters should buy a large fraction back"
+
+
+def test_items_scale_with_the_inverse_square_of_the_effect():
+    """
+    Halving the effect quadruples the sample. Stated because a linear
+    intuition here underestimates a study by a factor of four.
+    """
+    big = items_needed(0.40, rho_1=0.30, k=3)
+    small = items_needed(0.20, rho_1=0.30, k=3)
+    assert abs(small / big - 4.0) < 0.05, (big, small)
+
+
+def test_items_needed_grows_as_the_yardstick_gets_noisier():
+    """
+    The whole point of carrying reliability into the sampling plan: the same
+    study costs more items when a rating carries less signal.
+    """
+    clean = items_needed(0.30, rho_1=0.60, k=3)
+    noisy = items_needed(0.30, rho_1=0.10, k=3)
+    assert noisy > clean, (clean, noisy)
+    # attenuation is by sqrt(rho_k), so items scale as 1/rho_k exactly
+    assert abs(noisy / clean - spearman_brown(0.60, 3) / spearman_brown(0.10, 3)) < 0.02
+
+
+def test_items_needed_rejects_impossible_requests():
+    """
+    Same rule as the rest of the file: refuse rather than return a number
+    that looks like an answer.
+    """
+    for bad in (dict(effect_sd=0.0, rho_1=0.3, k=3),
+                dict(effect_sd=0.3, rho_1=0.0, k=3),
+                dict(effect_sd=0.3, rho_1=1.0, k=3),
+                dict(effect_sd=0.3, rho_1=0.3, k=0),
+                dict(effect_sd=0.3, rho_1=0.3, k=3, power=1.0),
+                dict(effect_sd=0.3, rho_1=0.3, k=3, alpha=0.0)):
+        try:
+            items_needed(**bad)
+            raise AssertionError(f"accepted {bad}")
+        except ValueError:
+            pass
+
+
+def test_matrix_table_is_rectangular_and_ordered():
+    table = matrix_table(0.2504, effects=(0.10, 0.30), ks=(1, 3, 8))
+    assert [r["effect"] for r in table] == [0.10, 0.30]
+    for row in table:
+        assert [c["k"] for c in row["cells"]] == [1, 3, 8]
+        counts = [c["items"] for c in row["cells"]]
+        assert counts == sorted(counts, reverse=True), counts
+    # a bigger effect is cheaper at every panel size
+    for a, b in zip(table[0]["cells"], table[1]["cells"]):
+        assert a["items"] > b["items"]
 
 
 # ------------------------------------------------------------ runner

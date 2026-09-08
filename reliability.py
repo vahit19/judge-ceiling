@@ -1,5 +1,5 @@
 """
-The month-one pipeline: rating rows in, a reliability table out.
+Rating rows in, a reliability table out.
 
 This is the code that would run on real rating data. It takes the one input
 that matters -- rows with rater identity preserved -- and produces, per
@@ -408,6 +408,111 @@ def budget_report(rho_1, ks=(1, 2, 3, 5, 8, 13)):
 
 
 # ---------------------------------------------------------------------------
+# The other axis: how many items, not just how many raters
+# ---------------------------------------------------------------------------
+def _normal_quantile(p):
+    """
+    Inverse standard normal CDF, by bisection on erf. Standard library only,
+    and accurate to floating point over the range a power calculation uses.
+    """
+    if not 0.0 < p < 1.0:
+        raise ValueError("p must be in (0, 1)")
+    lo, hi = -12.0, 12.0
+    for _ in range(100):
+        mid = (lo + hi) / 2.0
+        if 0.5 * (1.0 + math.erf(mid / math.sqrt(2.0))) < p:
+            lo = mid
+        else:
+            hi = mid
+    return (lo + hi) / 2.0
+
+
+def items_needed(effect_sd, rho_1, k, power=0.80, alpha=0.05):
+    """
+    Items per arm needed to detect an improvement of `effect_sd`, when each
+    item is scored by the mean of k raters.
+
+    A panel size answers "how reliable is the yardstick". It does not answer
+    "how much data do I need", and the two are not independent: measurement
+    error attenuates a standardised effect by sqrt(rho_k), and the required
+    sample grows with the inverse SQUARE of what survives. So a noisy
+    yardstick is not merely a weaker correlation -- it is a quadratic bill in
+    items.
+
+        observed effect = effect_sd * sqrt(rho_k)
+        n per arm       = 2 * ((z_alpha + z_power) / observed effect)^2
+
+    `effect_sd` is in standard deviations of the TRUE score, which is the
+    scale the attenuation is defined on; quoting an effect on the observed
+    scale instead would double-count the noise. Two independent arms, equal
+    size, normal approximation, variance treated as known.
+
+    This is a planning figure. Like every planning figure here it is an order
+    of magnitude, not a quota.
+    """
+    if not 0.0 < rho_1 < 1.0:
+        raise ValueError("rho_1 must be in (0, 1)")
+    if effect_sd <= 0.0:
+        raise ValueError("effect_sd must be positive")
+    if not 0.0 < power < 1.0:
+        raise ValueError("power must be in (0, 1)")
+    if not 0.0 < alpha < 1.0:
+        raise ValueError("alpha must be in (0, 1)")
+    if k < 1:
+        raise ValueError("panel size must be at least 1")
+
+    rho_k = spearman_brown(rho_1, k)
+    if rho_k <= 0.0:
+        return None
+    observed = effect_sd * math.sqrt(rho_k)
+    z_alpha = _normal_quantile(1.0 - alpha / 2.0)
+    z_power = _normal_quantile(power)
+    return int(math.ceil(2.0 * ((z_alpha + z_power) / observed) ** 2))
+
+
+def matrix_table(rho_1, effects=(0.10, 0.20, 0.30, 0.50), ks=(1, 3, 5, 8, 13),
+                 power=0.80, alpha=0.05):
+    """
+    The two-axis sampling plan: how many items, across how many raters, to
+    detect a given improvement.
+
+    Rows are effects, columns are panel sizes, cells are items per arm. A
+    panel size alone is half a plan and an item count alone is the other
+    half; the pair is what a study is actually costed on.
+
+    Both axes are driven by the same single input. rho_1 sets how much of a
+    real effect survives measurement at each panel size, and what survives
+    sets how many items are needed. That is the concrete reason a sampling
+    plan cannot be written without the reliability of one rating.
+    """
+    rows = []
+    for effect in effects:
+        cells = [{"k": k, "items": items_needed(effect, rho_1, k, power, alpha)}
+                 for k in ks]
+        rows.append({"effect": effect, "cells": cells})
+    return rows
+
+
+def matrix_report(rho_1, effects=(0.10, 0.20, 0.30, 0.50), ks=(1, 3, 5, 8, 13),
+                  power=0.80, alpha=0.05):
+    table = matrix_table(rho_1, effects, ks, power, alpha)
+    print(f"one rater's reliability rho_1 = {rho_1:.4f}")
+    print(f"items per arm, power {power:.0%}, alpha {alpha:g}")
+    print()
+    print(f"{'effect':>8s}" + "".join(f"{'k=' + str(k):>9s}" for k in ks))
+    print("-" * (8 + 9 * len(ks)))
+    for row in table:
+        cells = "".join(
+            f"{c['items']:>9d}" if c["items"] is not None else f"{'-':>9s}"
+            for c in row["cells"])
+        print(f"{row['effect']:>7.2f}s" + cells)
+    print()
+    print("Effects are in standard deviations of the true score. Reading right")
+    print("along a row prices extra raters in items saved; reading down a")
+    print("column prices ambition in items. Both need rho_1 and nothing else.")
+
+
+# ---------------------------------------------------------------------------
 # I/O
 # ---------------------------------------------------------------------------
 def load_csv(path):
@@ -458,6 +563,7 @@ USAGE = """usage:
   python reliability.py                 the worked demo on generated data
   python reliability.py ratings.csv     item_id, rater_id, dimension, score
   python reliability.py --budget RHO    what each panel size buys at rho_1=RHO
+  python reliability.py --matrix RHO    items x raters, to detect an effect
   python reliability.py --turns         same rows, turn vs conversation
 """
 
@@ -468,6 +574,13 @@ if __name__ == "__main__":
             sys.exit(USAGE)
         try:
             budget_report(float(args[1]))
+        except ValueError as e:
+            sys.exit(f"error: {e}")
+    elif args and args[0] == "--matrix":
+        if len(args) < 2:
+            sys.exit(USAGE)
+        try:
+            matrix_report(float(args[1]))
         except ValueError as e:
             sys.exit(f"error: {e}")
     elif args and args[0] == "--turns":

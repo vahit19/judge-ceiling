@@ -41,6 +41,7 @@ import csv
 import io
 import math
 import random
+import sys
 
 
 def make_ratings(n_items=300, k_raters=3, rho_1=0.45, rater_bias=0.0,
@@ -302,5 +303,77 @@ def demo():
     print("  the finding, and the system says what would settle it instead.")
 
 
+def departure_costs(rho_1=0.45, seeds=60, n_items=800, k_raters=3,
+                    scale=(1, 5), noise_spread=0.6):
+    """
+    What it costs the estimator when the data stops obeying its model.
+
+    The recovery checks generate rows from exactly the model the estimator
+    assumes, so they can confirm arithmetic and nothing else. These two
+    departures are real properties of real panels -- ratings land on a
+    five-point scale, and raters differ in how careful they are -- so the
+    cost of each is measured rather than asserted.
+
+    Measured across many seeds on purpose. A single draw moves enough that
+    picking one would be choosing the answer: the unequal-noise departure in
+    particular reverses direction on a minority of draws, so a one-seed
+    check can report the opposite of the truth and still look green.
+
+    Returns, per departure: the mean cost as a fraction of the estimate, the
+    range across seeds, and the share of draws in which the cost was
+    negative -- that is, the departure raised the estimate instead.
+    """
+    from reliability import icc_one_way
+
+    def measure(**kw):
+        costs = []
+        for seed in range(1, seeds + 1):
+            clean, _ = make_ratings(n_items=n_items, k_raters=k_raters,
+                                    rho_1=rho_1, seed=seed)
+            dirty, _ = make_ratings(n_items=n_items, k_raters=k_raters,
+                                    rho_1=rho_1, seed=seed, **kw)
+            a = icc_one_way(to_by_item(clean))[0]
+            b = icc_one_way(to_by_item(dirty))[0]
+            costs.append((a - b) / a)
+        return {
+            "mean": sum(costs) / len(costs),
+            "lo": min(costs),
+            "hi": max(costs),
+            "reversed_share": sum(1 for c in costs if c <= 0) / len(costs),
+            "seeds": len(costs),
+        }
+
+    return {
+        "likert": measure(scale=scale),
+        "rater_noise": measure(noise_spread=noise_spread),
+    }
+
+
+def departures_report(rho_1s=(0.45, 0.70), seeds=60):
+    print(f"COST OF LEAVING THE MODEL  ({seeds} seeds per cell)")
+    print()
+    print(f"{'departure':>26s}{'rho_1':>8s}{'mean':>9s}"
+          f"{'range':>18s}{'reversed':>10s}")
+    print("-" * 71)
+    for rho_1 in rho_1s:
+        out = departure_costs(rho_1=rho_1, seeds=seeds)
+        for name, label in (("likert", "five-point scale"),
+                            ("rater_noise", "unequal rater noise")):
+            d = out[name]
+            rng = f"[{d['lo']:+.1%}, {d['hi']:+.1%}]"
+            print(f"{label:>26s}{rho_1:>8.2f}{d['mean']:>9.1%}"
+                  f"{rng:>18s}{d['reversed_share']:>10.1%}")
+    print()
+    print("Cost is the share of the estimate lost. Positive means the")
+    print("departure biased the estimate DOWNWARD, which is the safe")
+    print("direction: understating reliability overstates how many raters")
+    print("are needed. `reversed` is the share of draws that went the other")
+    print("way -- small but not zero for unequal rater noise, which is why")
+    print("the claim is about the average and not about every draw.")
+
+
 if __name__ == "__main__":
-    demo()
+    if "--departures" in sys.argv[1:]:
+        departures_report()
+    else:
+        demo()
