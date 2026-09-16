@@ -41,10 +41,16 @@ def render(out_name="ceiling_chart.svg"):
     H = TOP + len(rows) * (BAR + GAP) - GAP + BOTTOM
     x = lambda v: LEFT + v / AXIS_MAX * plot
 
-    o = [f'<svg viewBox="0 0 {W} {H}" width="100%" role="img" '
+    # xmlns is required for a standalone file. Without it the chart renders
+    # when pasted inline into HTML and silently fails when loaded through an
+    # <img>, which is how a README shows it. Explicit width and height give
+    # the image the intrinsic size a percentage width does not.
+    o = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" '
+         f'width="{W}" height="{H}" role="img" '
          f'aria-label="Lower bound on single-rater reliability implied by each '
          f'dimension\'s best published judge score" '
-         f'style="font-family:Consolas,ui-monospace,monospace">',
+         f'style="max-width:100%;height:auto;'
+         f'font-family:Consolas,ui-monospace,monospace">',
          f'<rect width="{W}" height="{H}" fill="{SURFACE}"/>']
 
     t = 0.0

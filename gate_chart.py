@@ -66,10 +66,17 @@ def render(out_name="gate_chart.svg", built=0.45, seeds=12, resamples=300):
     px = lambda i: LEFT + (i / (n - 1)) * plot_w
     py = lambda v: TOP + plot_h - (v - Y_MIN) / (Y_MAX - Y_MIN) * plot_h
 
-    o = [f'<svg viewBox="0 0 {W} {H}" width="100%" role="img" '
+    # xmlns is required. Inline in HTML the parser assumes the SVG namespace,
+    # so the chart looks fine in a local page and fails silently everywhere it
+    # is loaded as a FILE -- which is how a README renders it. Explicit width
+    # and height for the same reason: an <img> needs an intrinsic size, and a
+    # percentage width alone gives it none.
+    o = [f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" '
+         f'width="{W}" height="{H}" role="img" '
          f'aria-label="Reported single-rater reliability against outlier-screen '
          f'tightness, on clean data, with the built value marked" '
-         f'style="font-family:Consolas,ui-monospace,monospace">',
+         f'style="max-width:100%;height:auto;'
+         f'font-family:Consolas,ui-monospace,monospace">',
          f'<rect width="{W}" height="{H}" fill="{SURFACE}"/>']
 
     # horizontal grid and y labels

@@ -47,10 +47,14 @@ jobs:
       - name: Committed results still match a fresh run
         run: python poison.py --check
 
-      - name: The figure regenerates
+      - name: Figures are loadable as files, not just inline (6 tests)
+        run: python test_charts.py
+
+      - name: The figures regenerate unchanged
         run: |
           python gate_chart.py
-          git diff --exit-code -- gate_chart.svg
+          python chart.py
+          git diff --exit-code -- gate_chart.svg ceiling_chart.svg
 
       - name: Reports run end to end
         run: |
