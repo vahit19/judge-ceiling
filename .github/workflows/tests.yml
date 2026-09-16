@@ -38,6 +38,12 @@ jobs:
       - name: Rating store refusals and provenance (11 tests)
         run: python test_store.py
 
+      - name: Quality-gate measurement (17 tests)
+        run: python test_poison.py
+
+      - name: Quality-gate invariants
+        run: python poison.py --self-test
+
       - name: Reports run end to end
         run: |
           python ceiling_bounds.py > /dev/null

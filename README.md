@@ -33,10 +33,15 @@ python store.py ingest ratings.csv --rubric v1
 python store.py sources                 # what produced which number
 python store.py analyse --rubric v1
 
+# what a quality gate does to the yardstick
+python poison.py               # the gate report card
+python poison.py --self-test   # 17 invariants, no tables
+
 # tests
 python test_ceiling.py         # 15: mathematics + data integrity
 python test_reliability.py     # 35: recovery, traps, and model-violation costs
 python test_store.py           # 11: store refusals and provenance
+python test_poison.py          # 17: injection, gates, and the finding
 python simulate.py --departures         # what leaving the model costs
 ```
 
@@ -100,6 +105,58 @@ If `ρ₁` on language stability is 0.60, then below `ρ₁ = 0.051` on acting t
 judge is doing *better* there, relative to what is achievable — the opposite of
 the raw-number reading. Whether that point is reached is empirical, and the
 measurement has not been published.
+
+## The gate that raises the number it was meant to protect
+
+A leaderboard that scores a judge against human votes treats those votes as
+ground truth, and the usual defence of that ground truth is a quality gate:
+drop the outlying ratings, drop the raters who do not track the panel.
+`poison.py` measures what the gate does, on rows whose reliability is known by
+construction.
+
+Two results, and the second is the one that matters.
+
+**Corruption is caught by where it sits, not by what it looks like.** Bad
+ratings concentrated inside one rater are caught at 98-100% whether they are
+obviously wrong or perfectly ordinary-looking, because a rater who does not
+track the panel is identifiable across many items. The same quantity of
+corruption spread thinly across raters is mostly missed - 4% to 29%. This was
+not the expected result: the opening hypothesis was that realism decides
+detection, and measured, location does most of the work. The crude arm is
+missed *more* than the plausible one, because a repeated central value is
+never an outlier.
+
+**On rows with nothing wrong with them, the gate reports a reliability it did
+not measure.**
+
+| screen | ratings dropped | reported `rho_1` | overstated by | panel it calls for |
+|---|---|---|---|---|
+| off | 0.0% | 0.4455 | -1% | 5 |
+| 3.0 sd | 7.4% | 0.5381 | +20% | 4 |
+| 2.5 sd | 11.1% | 0.5850 | +30% | 3 |
+| 2.0 sd | 16.9% | 0.6489 | **+44%** | 3 |
+| 1.5 sd | 27.0% | 0.7176 | +59% | 2 |
+| 1.0 sd | 43.9% | 0.8184 | +82% | 1 |
+
+Rows built at `rho_1 = 0.45`, 400 items x 5 raters, mean of 12 seeds. Nothing
+is corrupted, so the correct answer at every row is 0.45.
+
+Dropping the ratings that disagree most with the panel does not remove error.
+It removes disagreement, and less disagreement *is* higher measured agreement.
+The error is monotone in how hard the screen is run and it always points the
+same way: a panel that genuinely needs five raters is told three are enough,
+by the step that was supposed to protect the estimate.
+
+The consequence is not confined to a reliability figure. `rho_1` sets the
+ceiling any judge can reach against that yardstick, so an inflated `rho_1`
+inflates the ceiling, and a judge is then scored as a smaller fraction of a
+larger number than either of them deserves.
+
+What this does **not** do: nothing here estimates how many real ratings are
+wrong anywhere. The rows are simulated, which is the only way to know the
+catch rate and the collateral damage at the same time, and also the limit of
+the claim. It says what follows *if* some ratings are wrong, and what the
+standard defence does in that case.
 
 ## Assumptions
 
