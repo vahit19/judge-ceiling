@@ -167,11 +167,19 @@ repository is the other half of the same question and the distinction matters.
 Benchmark Optimization in ASR Models*, arXiv:2608.19936 (2026).** They audit the
 *model*. Three behavioural probes — reference disagreement, masked-entity
 recovery, orthographic switching — show that on VoxPopuli the six models with
-the best word error rate are exactly the six most likely to reproduce a
-benchmark's erroneous reference span, and that the behaviour is causally
-steerable: ablating one learned direction cuts it by 82–92%. Their remedy is
-structural — held-out sets, no i.i.d. splits, temporal or metadata
-stratification.
+the best word error rate are exactly the six with the highest rate of
+reproducing a benchmark's erroneous reference span, while every model at 6.5%
+WER or worse sits at or below 0.10. Their remedy is structural: held-out sets,
+no i.i.d. splits, temporal or metadata stratification.
+
+The result that bears hardest on this repository is not the audit but the
+mechanism. The behaviour is not a perception failure. Truncating the audio to a
+short window around the target span recovers the audio-true transcription;
+clones of benchmark speakers trigger the behaviour while a generic voice
+reading the same sentence does not; and on three of the elevated models,
+projecting out a single learned direction drops the rate by 82–92% while adding
+that direction induces it on voices that never showed it. The information is
+present and a policy discards it.
 
 **Ayllon, Baird, Brooks, Camps-Febrer, Cłapa, Lebryk, Madsen et al.,
 *RW-Voice-EQ Bench*, arXiv:2607.14846 (2026).** A multidimensional benchmark built from human
@@ -184,6 +192,11 @@ whose reliability is unknown, or inflated before anyone scores against it. The
 two failures are independent, and the second one is measurable from published
 numbers alone (`ceiling_bounds.py`) or from rating rows (`reliability.py`,
 `poison.py`).
+
+The shape is the same one their mechanism section describes. An outlier screen
+is also not a perception failure: the disagreement it deletes was measured,
+recorded, and available. A policy discards it, and the reported reliability
+rises because of the deletion rather than despite it.
 
 The connection runs the other way too. The ASR paper's conclusion names
 dataset-specific acoustic cues as a potential source of reward hacking once
