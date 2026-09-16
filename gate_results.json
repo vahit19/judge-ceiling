@@ -1,0 +1,227 @@
+{
+  "bootstrap_resamples": 300,
+  "built_rho_1": 0.45,
+  "k_raters": 5,
+  "n_items": 400,
+  "panel_the_truth_requires": 5,
+  "report_card": [
+    {
+      "caught": 1.0,
+      "kind": "crude",
+      "rate": 0.3,
+      "rho_gated": 0.6534,
+      "rho_ungated": 0.2891,
+      "where": "rater"
+    },
+    {
+      "caught": 0.0413,
+      "kind": "crude",
+      "rate": 0.3,
+      "rho_gated": 0.5123,
+      "rho_ungated": 0.3193,
+      "where": "scattered"
+    },
+    {
+      "caught": 0.982,
+      "kind": "plausible",
+      "rate": 0.3,
+      "rho_gated": 0.5865,
+      "rho_ungated": 0.1953,
+      "where": "rater"
+    },
+    {
+      "caught": 0.2915,
+      "kind": "plausible",
+      "rate": 0.3,
+      "rho_gated": 0.4988,
+      "rho_ungated": 0.2161,
+      "where": "scattered"
+    }
+  ],
+  "seeds": 12,
+  "sweep_continuous": [
+    {
+      "dropped": 0.0,
+      "interval": [
+        0.4194,
+        0.5086
+      ],
+      "overstated": -0.0101,
+      "panel_called_for": 5,
+      "reported": 0.4455,
+      "seed_range": [
+        0.4194,
+        0.4982
+      ],
+      "threshold": "off"
+    },
+    {
+      "dropped": 0.0742,
+      "interval": [
+        0.4902,
+        0.5879
+      ],
+      "overstated": 0.1957,
+      "panel_called_for": 4,
+      "reported": 0.5381,
+      "seed_range": [
+        0.5168,
+        0.5866
+      ],
+      "threshold": 3.0
+    },
+    {
+      "dropped": 0.1108,
+      "interval": [
+        0.5331,
+        0.6318
+      ],
+      "overstated": 0.3,
+      "panel_called_for": 3,
+      "reported": 0.585,
+      "seed_range": [
+        0.5633,
+        0.6335
+      ],
+      "threshold": 2.5
+    },
+    {
+      "dropped": 0.1695,
+      "interval": [
+        0.5943,
+        0.6812
+      ],
+      "overstated": 0.4419,
+      "panel_called_for": 3,
+      "reported": 0.6489,
+      "seed_range": [
+        0.6234,
+        0.698
+      ],
+      "threshold": 2.0
+    },
+    {
+      "dropped": 0.2699,
+      "interval": [
+        0.6543,
+        0.7343
+      ],
+      "overstated": 0.5946,
+      "panel_called_for": 2,
+      "reported": 0.7176,
+      "seed_range": [
+        0.7,
+        0.753
+      ],
+      "threshold": 1.5
+    },
+    {
+      "dropped": 0.4395,
+      "interval": [
+        0.794,
+        0.8552
+      ],
+      "overstated": 0.8187,
+      "panel_called_for": 1,
+      "reported": 0.8184,
+      "seed_range": [
+        0.7909,
+        0.8408
+      ],
+      "threshold": 1.0
+    }
+  ],
+  "sweep_five_point": [
+    {
+      "dropped": 0.0,
+      "interval": [
+        0.3733,
+        0.4639
+      ],
+      "overstated": -0.1005,
+      "panel_called_for": 6,
+      "reported": 0.4048,
+      "seed_range": [
+        0.3797,
+        0.4661
+      ],
+      "threshold": "off"
+    },
+    {
+      "dropped": 0.0258,
+      "interval": [
+        0.4348,
+        0.5268
+      ],
+      "overstated": 0.0496,
+      "panel_called_for": 5,
+      "reported": 0.4723,
+      "seed_range": [
+        0.4349,
+        0.5345
+      ],
+      "threshold": 3.0
+    },
+    {
+      "dropped": 0.064,
+      "interval": [
+        0.4815,
+        0.5794
+      ],
+      "overstated": 0.1718,
+      "panel_called_for": 4,
+      "reported": 0.5273,
+      "seed_range": [
+        0.4854,
+        0.5922
+      ],
+      "threshold": 2.5
+    },
+    {
+      "dropped": 0.1211,
+      "interval": [
+        0.5528,
+        0.6406
+      ],
+      "overstated": 0.3402,
+      "panel_called_for": 3,
+      "reported": 0.6031,
+      "seed_range": [
+        0.57,
+        0.6567
+      ],
+      "threshold": 2.0
+    },
+    {
+      "dropped": 0.1322,
+      "interval": [
+        0.5659,
+        0.6517
+      ],
+      "overstated": 0.375,
+      "panel_called_for": 3,
+      "reported": 0.6187,
+      "seed_range": [
+        0.5869,
+        0.6691
+      ],
+      "threshold": 1.5
+    },
+    {
+      "dropped": 0.3507,
+      "interval": [
+        0.7723,
+        0.8382
+      ],
+      "overstated": 0.7817,
+      "panel_called_for": 1,
+      "reported": 0.8018,
+      "seed_range": [
+        0.766,
+        0.8404
+      ],
+      "threshold": 1.0
+    }
+  ],
+  "target_rho_k": 0.8
+}

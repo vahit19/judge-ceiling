@@ -1,15 +1,39 @@
-# Ceiling bounds from a public judge leaderboard
+# Auditing the yardstick a judge leaderboard is scored against
 
-A small, reproducible analysis: **every correlation published on a judge
-leaderboard places a lower bound on the rater agreement that is not published.**
+A judge leaderboard scores a model against human votes and treats those votes
+as ground truth. This repository asks what is known about the votes. Three
+results, each reproducible in seconds with no data, no credentials and no
+third-party packages.
 
-Nothing here needs private data, credentials, or an API key. The whole chain —
-fetch, verify, compute, test — runs from a public URL in about ten seconds.
+**1. Every published correlation is also a statement about the raters.** Under
+classical test theory the reliability of a single human vote is at least the
+square of any correlation reported against it. On Language Stability a best
+judge of `0.7033` implies `rho_1 >= 0.4946`; on Acting, `0.2049` implies
+`>= 0.042`. The bound is tight where the board already looks strong and loose
+exactly where the interesting question is.
+[The argument](#the-argument) · `python ceiling_bounds.py`
 
-It has two halves. The first derives what can be said **without** access:
-a bound on rater agreement from published numbers alone. The second is the
-**pipeline that would run on rating rows** if access existed -- validated on
-simulated data where the answer is known by construction.
+**2. The standard quality gate raises the number it was meant to protect.** On
+rating rows with nothing wrong with them, a two-sigma outlier screen reports a
+single-rater reliability **44% above** the value the rows were built with, and
+the error grows monotonically as the screen is tightened. Dropping the ratings
+that disagree most with the panel does not remove error; it removes
+disagreement. A panel that genuinely needs five raters is told three are
+enough.
+[The measurement](#the-gate-that-raises-the-number-it-was-meant-to-protect) ·
+`python poison.py`
+
+![Reported reliability against screen tightness, on clean data](gate_chart.svg)
+
+**3. What a gate catches is decided by where the corruption sits, not by what
+it looks like.** Corruption concentrated inside one rater is caught 98–100% of
+the time whatever it looks like; the same quantity spread thinly is caught
+4–29%. This contradicted the hypothesis the experiment was built to test, and
+[the code says so](poison.py) rather than reporting the flattering half.
+
+Every number above regenerates into [`gate_results.json`](gate_results.json),
+which continuous integration recomputes and diffs on each push — so a
+committed figure is a claim rather than a copy-paste.
 
 ## Run it
 
@@ -35,7 +59,10 @@ python store.py analyse --rubric v1
 
 # what a quality gate does to the yardstick
 python poison.py               # the gate report card
+python poison.py --json        # regenerate gate_results.json
+python poison.py --check       # recompute and diff against the saved file
 python poison.py --self-test   # 17 invariants, no tables
+python gate_chart.py           # the figure (SVG)
 
 # tests
 python test_ceiling.py         # 15: mathematics + data integrity
@@ -178,6 +205,68 @@ wrong anywhere. The rows are simulated, which is the only way to know the
 catch rate and the collateral damage at the same time, and also the limit of
 the claim. It says what follows *if* some ratings are wrong, and what the
 standard defence does in that case.
+
+## Running this on your own rating rows
+
+The bound in result 1 needs nothing. Results 2 and 3 need rows, and the only
+thing that changes is the input: no re-collection, no change to how ratings
+were gathered, no model access.
+
+A CSV with four columns, one row per rating:
+
+```
+item_id,rater_id,dimension,score
+clip_0001,r_17,naturalness,4
+clip_0001,r_43,naturalness,3
+```
+
+`item_id` is whatever was rated — a clip, or a whole conversation. Which one
+you choose is a modelling decision and not a property of the file, and it
+changes the answer: see [what the simulation cannot
+validate](#what-the-simulation-cannot-validate). `rater_id` must be stable
+across items, because everything a rater screen can do depends on being able
+to follow one person across the set. Anonymous ids are fine; the identity is
+never needed, only the grouping.
+
+```bash
+python reliability.py ratings.csv          # rho_1, rho_k, ceiling, interval
+python reliability.py --budget 0.2504      # what each panel size buys
+python store.py ingest ratings.csv --rubric v1
+```
+
+Two refusals are deliberate and worth knowing before you run it. The two-way
+model refuses an unbalanced design rather than approximating one, because the
+approximation was measured at +0.30 against a true 0.45. And the substitution
+gate refuses when the interval runs to infinity, because a point estimate is
+arbitrarily large at that sample size. In both cases the tool reports what
+would settle the question instead of answering it.
+
+## What is not done yet
+
+Named rather than implied, because the gap between the two is the honest part
+of a small result.
+
+**The rows are simulated.** That is the only way to know the catch rate and the
+collateral damage at the same time, and it is also the ceiling on what result 2
+can claim. On real rows the corrupted fraction is unknown, so the measurable
+quantity changes: not "how much does the gate overstate", but "how much does
+the reported reliability move when the gate is turned off". That comparison
+needs no ground truth and is the first thing to run on real data.
+
+**Only two screens are modelled** — an outlier rule and a rater-agreement rule.
+Real pipelines also use attention checks, seeded gold items and time-on-task.
+Each is a different selection rule on the same rows and each should be swept
+the same way.
+
+**The consequence for a judge is argued, not computed.** An inflated `rho_1`
+inflates the ceiling, and a judge is then scored as a fraction of a number
+nobody measured. Running a simulated judge through both yardsticks would put a
+figure on that rather than a direction.
+
+**Rater bias is not separated in the corrupted arms.** `poison.py` reports the
+one-way model throughout. The two-way model in `reliability.py` separates rater
+bias from residual noise, and rater-concentrated corruption is exactly the case
+where the distinction should matter.
 
 ## Related work, and what this does differently
 
@@ -520,12 +609,18 @@ test_ceiling.py         15 tests, no test framework required
 test_reliability.py     35 tests, including six traps and the robustness costs
 store.py                rating store: rater identity, rubric version, provenance
 test_store.py           11 tests, mostly refusals
+poison.py               what a quality gate does to the yardstick
+gate_chart.py           renders gate_chart.svg
+gate_chart.svg          the figure at the top, regenerated by gate_chart.py
+gate_results.json       every quoted number, recomputed and diffed in CI
+test_poison.py          21 tests: injection, gates, and the finding
 ```
 
 ## Continuous integration
 
-Every push runs the mathematics self-checks, both test suites, and every
-report end to end. A separate scheduled job re-fetches the live leaderboard
+Every push runs the mathematics self-checks, all four test suites, every
+report end to end, and `poison.py --check`, which recomputes the saved results
+file and fails if any committed number has moved. A separate scheduled job re-fetches the live leaderboard
 and reports if any published number has changed -- kept separate because
 upstream moving is news, not a broken build.
 

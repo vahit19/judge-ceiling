@@ -44,6 +44,14 @@ jobs:
       - name: Quality-gate invariants
         run: python poison.py --self-test
 
+      - name: Committed results still match a fresh run
+        run: python poison.py --check
+
+      - name: The figure regenerates
+        run: |
+          python gate_chart.py
+          git diff --exit-code -- gate_chart.svg
+
       - name: Reports run end to end
         run: |
           python ceiling_bounds.py > /dev/null

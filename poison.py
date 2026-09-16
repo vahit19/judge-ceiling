@@ -58,9 +58,14 @@ says what follows IF some are.
 Usage:
     python poison.py                # the report card
     python poison.py --self-test    # the invariants, without the tables
+    python poison.py --json         # regenerate gate_results.json
+    python poison.py --check        # recompute and diff against the saved file
 """
 
+import io
+import json
 import math
+import os
 import random
 import sys
 
@@ -477,6 +482,92 @@ def dose_report(rates=(0.0, 0.10, 0.20, 0.40), seeds=12, target=0.80, **kw):
     print("what turns 'our gate protects the yardstick' into a measured claim.")
 
 
+RESULTS = "gate_results.json"
+
+
+def results(built=0.45, seeds=12, resamples=300):
+    """Every number quoted in the README, as one structure.
+
+    Saved to disk and re-checked in continuous integration for the same reason
+    `fetch_leaderboard.py --check` exists: a committed number that is never
+    recomputed is a copy-paste, not a claim. The sweep is deterministic --
+    fixed seeds, fixed bootstrap seed -- so a diff here means the code moved.
+    """
+    def sweep(scale):
+        out = []
+        for r in gate_sweep(z_values=(None, 3.0, 2.5, 2.0, 1.5, 1.0),
+                            rho_1=built, seeds=seeds, scale=scale,
+                            resamples=resamples):
+            out.append({
+                "threshold": "off" if r["z"] is None else r["z"],
+                "dropped": round(r["dropped"], 4),
+                "reported": round(r["reported"], 4),
+                "interval": [round(r["lo"], 4), round(r["hi"], 4)],
+                "seed_range": [round(r["spread"][0], 4), round(r["spread"][1], 4)],
+                "overstated": round(r["reported"] / built - 1.0, 4),
+                "panel_called_for": raters_needed(r["reported"], 0.80),
+            })
+        return out
+
+    cells = []
+    for kind in KINDS:
+        for where in PLACES:
+            cs = [run_cell(kind, where, 0.30, rho_1=built, seed=s)
+                  for s in range(seeds)]
+            cells.append({
+                "kind": kind, "where": where, "rate": 0.30,
+                "rho_ungated": round(_avg(cs, "rho_dirty"), 4),
+                "rho_gated": round(_avg(cs, "rho_gated"), 4),
+                "caught": round(_avg(cs, "catch"), 4),
+            })
+
+    return {
+        "built_rho_1": built,
+        "seeds": seeds,
+        "bootstrap_resamples": resamples,
+        "n_items": 400,
+        "k_raters": 5,
+        "target_rho_k": 0.80,
+        "panel_the_truth_requires": raters_needed(built, 0.80),
+        "sweep_continuous": sweep(None),
+        "sweep_five_point": sweep((1, 5)),
+        "report_card": cells,
+    }
+
+
+def write_results(path=None):
+    path = path or os.path.join(os.path.dirname(os.path.abspath(__file__)), RESULTS)
+    data = results()
+    io.open(path, "w", encoding="utf-8").write(
+        json.dumps(data, indent=2, sort_keys=True) + chr(10))
+    print(f"wrote {os.path.basename(path)}")
+    return data
+
+
+def check_results(path=None):
+    """Recompute and compare. Non-zero exit if anything moved."""
+    path = path or os.path.join(os.path.dirname(os.path.abspath(__file__)), RESULTS)
+    if not os.path.exists(path):
+        print(f"{RESULTS} is missing -- run: python poison.py --json")
+        return False
+    saved = json.load(io.open(path, encoding="utf-8"))
+    fresh = results(built=saved["built_rho_1"], seeds=saved["seeds"],
+                    resamples=saved["bootstrap_resamples"])
+    if saved == fresh:
+        print(f"{RESULTS} matches a fresh run")
+        return True
+
+    for key in sorted(set(saved) | set(fresh)):
+        if saved.get(key) != fresh.get(key):
+            print(f"  differs: {key}")
+            if isinstance(saved.get(key), list) and isinstance(fresh.get(key), list):
+                for a, b in zip(saved[key], fresh[key]):
+                    if a != b:
+                        print(f"    saved {a}")
+                        print(f"    fresh {b}")
+    return False
+
+
 def self_test():
     """Invariants that must hold before any table above is worth reading."""
     checks = []
@@ -606,8 +697,14 @@ def self_test():
 
 
 if __name__ == "__main__":
-    if "--self-test" in sys.argv[1:]:
+    args = sys.argv[1:]
+    if "--self-test" in args:
         sys.exit(0 if self_test() else 1)
+    if "--json" in args:
+        write_results()
+        sys.exit(0)
+    if "--check" in args:
+        sys.exit(0 if check_results() else 1)
     sweep_report()
     report_card()
     dose_report()
