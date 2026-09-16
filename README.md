@@ -158,6 +158,40 @@ catch rate and the collateral damage at the same time, and also the limit of
 the claim. It says what follows *if* some ratings are wrong, and what the
 standard defence does in that case.
 
+## Related work, and what this does differently
+
+Two recent audits from the same direction are worth naming, because this
+repository is the other half of the same question and the distinction matters.
+
+**Lebryk, Ayllon, Baird, Cłapa, Madsen and Tzirakis, *Towards Quantifying
+Benchmark Optimization in ASR Models*, arXiv:2608.19936 (2026).** They audit the
+*model*. Three behavioural probes — reference disagreement, masked-entity
+recovery, orthographic switching — show that on VoxPopuli the six models with
+the best word error rate are exactly the six most likely to reproduce a
+benchmark's erroneous reference span, and that the behaviour is causally
+steerable: ablating one learned direction cuts it by 82–92%. Their remedy is
+structural — held-out sets, no i.i.d. splits, temporal or metadata
+stratification.
+
+**Ayllon, Baird, Brooks, Camps-Febrer, Cłapa, Lebryk, Madsen et al.,
+*RW-Voice-EQ Bench*, arXiv:2607.14846 (2026).** A multidimensional benchmark built from human
+ratings, which is the kind of yardstick this repository's bound is derived
+from.
+
+This repository audits the *yardstick* instead. A held-out set fixes a
+benchmark that is too easy to fit; it does nothing about a reference signal
+whose reliability is unknown, or inflated before anyone scores against it. The
+two failures are independent, and the second one is measurable from published
+numbers alone (`ceiling_bounds.py`) or from rating rows (`reliability.py`,
+`poison.py`).
+
+The connection runs the other way too. The ASR paper's conclusion names
+dataset-specific acoustic cues as a potential source of reward hacking once
+reinforcement learning enters speech models. A reward model trained on human
+ratings inherits whatever the rating pipeline's quality gate let through — and
+what that gate lets through, and what it does to the reported reliability while
+doing it, is exactly what `poison.py` measures.
+
 ## Assumptions
 
 1. **Classical test theory** — observed = true + independent error. If judge and
