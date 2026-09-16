@@ -41,7 +41,7 @@ python poison.py --self-test   # 17 invariants, no tables
 python test_ceiling.py         # 15: mathematics + data integrity
 python test_reliability.py     # 35: recovery, traps, and model-violation costs
 python test_store.py           # 11: store refusals and provenance
-python test_poison.py          # 17: injection, gates, and the finding
+python test_poison.py          # 21: injection, gates, and the finding
 python simulate.py --departures         # what leaving the model costs
 ```
 
@@ -129,17 +129,38 @@ never an outlier.
 **On rows with nothing wrong with them, the gate reports a reliability it did
 not measure.**
 
-| screen | ratings dropped | reported `rho_1` | overstated by | panel it calls for |
-|---|---|---|---|---|
-| off | 0.0% | 0.4455 | -1% | 5 |
-| 3.0 sd | 7.4% | 0.5381 | +20% | 4 |
-| 2.5 sd | 11.1% | 0.5850 | +30% | 3 |
-| 2.0 sd | 16.9% | 0.6489 | **+44%** | 3 |
-| 1.5 sd | 27.0% | 0.7176 | +59% | 2 |
-| 1.0 sd | 43.9% | 0.8184 | +82% | 1 |
+| screen | dropped | reported `rho_1` | 95% interval | across 12 seeds | overstated | panel it calls for |
+|---|---|---|---|---|---|---|
+| off | 0.0% | 0.4455 | [0.419, 0.509] | [0.419, 0.498] | -1% | 5 |
+| 3.0 sd | 7.4% | 0.5381 | [0.490, 0.588] | [0.517, 0.587] | +20% | 4 |
+| 2.5 sd | 11.1% | 0.5850 | [0.533, 0.632] | [0.563, 0.634] | +30% | 3 |
+| 2.0 sd | 16.9% | 0.6489 | [0.594, 0.681] | [0.623, 0.698] | **+44%** | 3 |
+| 1.5 sd | 27.0% | 0.7176 | [0.654, 0.734] | [0.700, 0.753] | +59% | 2 |
+| 1.0 sd | 43.9% | 0.8184 | [0.794, 0.855] | [0.791, 0.841] | +82% | 1 |
 
 Rows built at `rho_1 = 0.45`, 400 items x 5 raters, mean of 12 seeds. Nothing
-is corrupted, so the correct answer at every row is 0.45.
+is corrupted, so the correct answer at every row is 0.45. The interval is a
+bootstrap over items on one draw; the seed range is how much the point estimate
+moves between studies of this size. They answer different questions and both
+are reported, because the gate-off interval and the 2.0 sd interval **do not
+overlap** — which is what makes this a measurement rather than a direction.
+
+Real panel ratings are not continuous. On a five-point scale the same sweep
+gives:
+
+| screen | dropped | reported `rho_1` | 95% interval | overstated | panel |
+|---|---|---|---|---|---|
+| off | 0.0% | 0.4048 | [0.373, 0.464] | -10% | 6 |
+| 3.0 sd | 2.6% | 0.4723 | [0.435, 0.527] | +5% | 5 |
+| 2.5 sd | 6.4% | 0.5273 | [0.481, 0.579] | +17% | 4 |
+| 2.0 sd | 12.1% | 0.6031 | [0.553, 0.641] | **+34%** | 3 |
+| 1.5 sd | 13.2% | 0.6187 | [0.566, 0.652] | +37% | 3 |
+| 1.0 sd | 35.1% | 0.8018 | [0.772, 0.838] | +78% | 1 |
+
+Rounding costs the estimate a few points at every threshold — the same
+downward bias this repository measures elsewhere — so it changes the size of
+the overstatement and not its direction. That is the reason both tables are
+here rather than the friendlier one alone.
 
 Dropping the ratings that disagree most with the panel does not remove error.
 It removes disagreement, and less disagreement *is* higher measured agreement.

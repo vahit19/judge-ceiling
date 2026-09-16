@@ -223,6 +223,86 @@ def test_the_gate_reports_a_smaller_panel_than_the_truth_requires():
         f"ungated {ungated:.4f} -> {raters_needed(ungated, 0.80)}")
 
 
+def test_the_scale_option_reaches_the_sweep():
+    """
+    Guards the five-point row below. If `scale` were accepted and then dropped
+    on the way to the generator, the Likert table would be the continuous one
+    wearing a label -- and it would agree with every other test. So the guard
+    is that the two sweeps must DIFFER, not merely that rounding works.
+    """
+    r, _ = make_ratings(n_items=50, k_raters=5, rho_1=BUILT, seed=1,
+                        scale=(1, 5))
+    vals = {float(x["score"]) for x in r}
+    assert vals <= {1.0, 2.0, 3.0, 4.0, 5.0}, sorted(vals)[:8]
+    assert len(vals) > 2, "rounding collapsed the scale to a constant"
+
+    cont = gate_sweep(z_values=(None, 2.0), seeds=4)
+    lik = gate_sweep(z_values=(None, 2.0), scale=(1, 5), seeds=4)
+    for a, b in zip(cont, lik):
+        assert abs(a["reported"] - b["reported"]) > 1e-6, (
+            f"scale had no effect at z={a['z']}")
+    # Rounding is known to bias the estimate downward; the repository measures
+    # that elsewhere. Asserting the direction keeps the two tables comparable.
+    assert lik[0]["reported"] < cont[0]["reported"], (cont[0], lik[0])
+
+
+def test_the_inflation_holds_on_a_five_point_scale():
+    """
+    The form real panel ratings arrive in. Rounding is known to cost a few per
+    cent of the estimate, so a result that existed only on continuous scores
+    would be a property of the simulation rather than of the gate.
+    """
+    sweep = {r["z"]: r for r in
+             gate_sweep(z_values=(None, 2.0), scale=(1, 5), seeds=12)}
+    off, tight = sweep[None], sweep[2.0]
+    assert tight["reported"] > off["reported"], (off, tight)
+    assert tight["reported"] > BUILT * 1.2, tight
+    assert raters_needed_(tight["reported"]) < raters_needed_(off["reported"])
+
+
+def test_the_gated_and_ungated_intervals_do_not_overlap():
+    """
+    What makes this a claim rather than a direction. If the bootstrap intervals
+    overlapped, the difference would be within what one study of this size can
+    resolve, and the honest report would be the trend only.
+    """
+    sweep = {r["z"]: r for r in
+             gate_sweep(z_values=(None, 2.0), seeds=4, resamples=300)}
+    off, tight = sweep[None], sweep[2.0]
+    assert off.get("hi") is not None and tight.get("lo") is not None, (
+        "no bootstrap interval was computed; `resamples` did not reach analyse")
+    assert tight["lo"] > off["hi"], (
+        f"off [{off['lo']:.3f}, {off['hi']:.3f}] overlaps "
+        f"gated [{tight['lo']:.3f}, {tight['hi']:.3f}]")
+
+
+def test_the_seed_spread_is_the_real_spread_across_seeds():
+    """
+    A single draw would be choosing the answer, so the tables report a range.
+    Checking only that the range is non-empty would pass on a hard-coded pair,
+    so the range is recomputed here from the same seeds and must match.
+    """
+    seeds, z = 8, 2.0
+    row = gate_sweep(z_values=(z,), seeds=seeds)[0]
+
+    mine = []
+    for seed in range(seeds):
+        r, _ = make_ratings(n_items=400, k_raters=5, rho_1=BUILT, seed=seed)
+        d = gate_outlier(r, z=z)
+        mine.append(_rho([x for x, drop in zip(r, d) if not drop]))
+
+    lo, hi = row["spread"]
+    assert abs(lo - min(mine)) < 1e-9, (lo, min(mine))
+    assert abs(hi - max(mine)) < 1e-9, (hi, max(mine))
+    assert abs(row["reported"] - sum(mine) / len(mine)) < 1e-9
+    assert hi > lo, "eight seeds produced an identical estimate"
+
+
+def raters_needed_(rho):
+    from reliability import raters_needed
+    return raters_needed(rho, 0.80)
+
+
 # ------------------------------------------------------------ built-in runner
 
 if __name__ == "__main__":
@@ -235,6 +315,13 @@ if __name__ == "__main__":
             print(f"  PASS  {name}")
         except AssertionError as e:
             print(f"  FAIL  {name}  -> {e}")
+            failed += 1
+        except Exception as e:
+            # A test that raises instead of asserting is still a failure, and
+            # it must not take the rest of the suite down with it: an aborted
+            # run prints fewer FAIL lines than a healthy one, which reads as
+            # better rather than worse.
+            print(f"  ERROR {name}  -> {type(e).__name__}: {e}")
             failed += 1
     print(f"\n{len(tests) - failed}/{len(tests)} passed")
     sys.exit(1 if failed else 0)

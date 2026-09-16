@@ -38,7 +38,7 @@ jobs:
       - name: Rating store refusals and provenance (11 tests)
         run: python test_store.py
 
-      - name: Quality-gate measurement (17 tests)
+      - name: Quality-gate measurement (21 tests)
         run: python test_poison.py
 
       - name: Quality-gate invariants

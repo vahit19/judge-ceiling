@@ -252,5 +252,12 @@ if __name__ == "__main__":
         except AssertionError as e:
             print(f"  FAIL  {name}  -> {e}")
             failed += 1
+        except Exception as e:
+            # A test that raises instead of asserting is still a failure, and
+            # it must not take the rest of the suite down with it: an aborted
+            # run prints fewer FAIL lines than a healthy one, which reads as
+            # better rather than worse.
+            print(f"  ERROR {name}  -> {type(e).__name__}: {e}")
+            failed += 1
     print(f"\n{len(tests) - failed}/{len(tests)} passed")
     sys.exit(1 if failed else 0)

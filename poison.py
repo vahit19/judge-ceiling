@@ -64,7 +64,7 @@ import math
 import random
 import sys
 
-from reliability import icc_one_way, raters_needed
+from reliability import analyse, icc_one_way, raters_needed
 from simulate import make_ratings, to_by_item
 
 CRUDE, PLAUSIBLE = "crude", "plausible"
@@ -255,7 +255,7 @@ def _avg(cells, key):
 
 
 def gate_sweep(z_values=(None, 3.0, 2.5, 2.0, 1.5, 1.0), rho_1=0.45,
-               n_items=400, k_raters=5, seeds=12):
+               n_items=400, k_raters=5, seeds=12, scale=None, resamples=0):
     """What a gate reports on CLEAN data, as the threshold tightens.
 
     Nothing here is corrupted, so there is nothing to catch and the honest
@@ -265,13 +265,23 @@ def gate_sweep(z_values=(None, 3.0, 2.5, 2.0, 1.5, 1.0), rho_1=0.45,
     within-item spread, and a truncated spread IS higher agreement.
 
     z=None means the gate is effectively off.
+
+    scale=(lo, hi) rounds every rating onto an integer scale, as a Likert panel
+    would. This matters: the rest of this repository measures that rounding
+    costs the estimate a few per cent, so a result obtained only on continuous
+    scores would not obviously survive the form real ratings arrive in.
+
+    resamples > 0 adds a bootstrap interval over items, taken on one seed --
+    the seed-to-seed spread is reported separately as `spread`. The two answer
+    different questions: the interval is how precisely one study of this size
+    pins the number, the spread is how much the number moves between studies.
     """
     out = []
     for z in z_values:
         reported, dropped = [], []
         for seed in range(seeds):
             rows, _ = make_ratings(n_items=n_items, k_raters=k_raters,
-                                   rho_1=rho_1, seed=seed)
+                                   rho_1=rho_1, seed=seed, scale=scale)
             if z is None:
                 kept, d = rows, [False] * len(rows)
             else:
@@ -279,37 +289,83 @@ def gate_sweep(z_values=(None, 3.0, 2.5, 2.0, 1.5, 1.0), rho_1=0.45,
                 kept = [r for r, x in zip(rows, d) if not x]
             reported.append(_rho(kept))
             dropped.append(sum(d) / len(d))
-        out.append({"z": z,
-                    "dropped": sum(dropped) / len(dropped),
-                    "reported": sum(reported) / len(reported)})
+
+        row = {"z": z,
+               "dropped": sum(dropped) / len(dropped),
+               "reported": sum(reported) / len(reported),
+               "spread": (min(reported), max(reported)),
+               "seeds": len(reported)}
+
+        if resamples:
+            rows, _ = make_ratings(n_items=n_items, k_raters=k_raters,
+                                   rho_1=rho_1, seed=0, scale=scale)
+            if z is None:
+                kept = rows
+            else:
+                d = gate_outlier(rows, z=z)
+                kept = [r for r, x in zip(rows, d) if not x]
+            a = analyse(to_by_item(kept), resamples=resamples, seed=1)
+            row["lo"], row["hi"] = a["rho_1_lo"], a["rho_1_hi"]
+        out.append(row)
     return out
 
 
-def sweep_report(rho_1=0.45, seeds=12, target=0.80, **kw):
-    rows = gate_sweep(rho_1=rho_1, seeds=seeds, **kw)
-    print("=" * 78)
-    print("WHAT THE GATE REPORTS WHEN THERE IS NOTHING TO CATCH")
-    print("=" * 78)
-    print(f"Clean rows built at rho_1 = {rho_1}. No corruption of any kind.")
-    print("The only correct answer at every threshold is the built value.")
-    print()
-    print(f"{'threshold':>11s}{'dropped':>10s}{'reported rho_1':>16s}"
-          f"{'overstated by':>15s}{'panel says':>12s}")
-    print("-" * 78)
-    for r in rows:
-        label = "off" if r["z"] is None else f"{r['z']:.1f} sd"
-        over = r["reported"] / rho_1 - 1.0
-        need = raters_needed(r["reported"], target)
-        print(f"{label:>11s}{r['dropped']:10.1%}{r['reported']:16.4f}"
-              f"{over:+15.0%}{need:12d}")
-    print()
+def sweep_report(rho_1=0.45, seeds=12, target=0.80, resamples=300, **kw):
+    """The headline table, on continuous scores and again on a five-point scale.
+
+    Both are shown because neither alone would settle it. Continuous scores are
+    the model the estimator assumes; a five-point scale is the form real panel
+    ratings arrive in, and rounding is known to cost a few per cent of the
+    estimate. A result that appeared only on one of the two would be a property
+    of the simulation rather than of the gate.
+    """
     true_need = raters_needed(rho_1, target)
+    out = {}
+    for label, scale in (("CONTINUOUS SCORES", None),
+                         ("FIVE-POINT SCALE (1-5)", (1, 5))):
+        rows = gate_sweep(rho_1=rho_1, seeds=seeds, scale=scale,
+                          resamples=resamples, **kw)
+        out[label] = rows
+        print("=" * 78)
+        print(f"WHAT THE GATE REPORTS WHEN THERE IS NOTHING TO CATCH -- {label}")
+        print("=" * 78)
+        print(f"Clean rows built at rho_1 = {rho_1}. No corruption of any kind.")
+        print("The only correct answer at every threshold is the built value.")
+        print(f"Interval: bootstrap over items on one draw ({resamples} resamples).")
+        print(f"Spread: min-max of the point estimate across {seeds} seeds.")
+        print()
+        print(f"{'threshold':>11s}{'dropped':>9s}{'reported':>10s}"
+              f"{'95% interval':>20s}{'seed spread':>20s}"
+              f"{'over':>7s}{'panel':>7s}")
+        print("-" * 78)
+        for r in rows:
+            name = "off" if r["z"] is None else f"{r['z']:.1f} sd"
+            over = r["reported"] / rho_1 - 1.0
+            iv = (f"[{r['lo']:.3f}, {r['hi']:.3f}]" if r.get("lo") is not None
+                  else "-")
+            sp = f"[{r['spread'][0]:.3f}, {r['spread'][1]:.3f}]"
+            print(f"{name:>11s}{r['dropped']:9.1%}{r['reported']:10.4f}"
+                  f"{iv:>20s}{sp:>20s}{over:+7.0%}"
+                  f"{raters_needed(r['reported'], target):7d}")
+        print()
+
+    cont = {r["z"]: r for r in out["CONTINUOUS SCORES"]}
+    lik = {r["z"]: r for r in out["FIVE-POINT SCALE (1-5)"]}
     print(f"  A panel of {true_need} is what rho_1 = {rho_1} actually requires for")
-    print(f"  rho_k = {target}. Every tightening of the gate reports a smaller one.")
-    print("  The error is not noise: it is monotone in how hard the gate is run,")
-    print("  and it always points the same way -- towards fewer raters than the")
-    print("  measurement can support.")
-    return rows
+    print(f"  rho_k = {target}. Every tightening of the gate reports a smaller one,")
+    print("  on both scales.")
+    print()
+    print(f"  At 2.0 sd the overstatement is {cont[2.0]['reported'] / rho_1 - 1:+.0%} on")
+    print(f"  continuous scores and {lik[2.0]['reported'] / rho_1 - 1:+.0%} on a five-point")
+    print("  scale. Rounding changes the size and not the direction, which is the")
+    print("  point of running both.")
+    print()
+    print("  The intervals matter for what can be claimed. Where the gate-off")
+    print("  interval and a gated interval do not overlap, the difference is not")
+    print("  a sampling accident at this study size. Where they do overlap, the")
+    print("  seed spread is the honest summary and the claim is about the trend")
+    print("  across thresholds rather than about any single row.")
+    return out
 
 
 def report_card(rate=0.30, seeds=12, target=0.80, **kw):
