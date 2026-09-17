@@ -534,6 +534,36 @@ def test_matrix_table_is_rectangular_and_ordered():
         assert a["items"] > b["items"]
 
 
+def test_the_readme_planning_table_matches_a_fresh_run():
+    """
+    The README prints the items-by-raters table inline, because it is the most
+    directly usable output here and a reader should not have to run anything to
+    see it. A table transcribed once and never recomputed goes stale silently,
+    so every cell is checked against the function that produced it.
+    """
+
+    import io
+    import os
+
+    from reliability import matrix_table
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    readme = io.open(os.path.join(here, "README.md"), encoding="utf-8").read()
+
+    start = readme.find("| effect | k=1 rater")
+    assert start >= 0, "the planning table is not in the README"
+    text = readme[start:readme.index(chr(10) + chr(10), start)]
+    rows = matrix_table(0.2504, effects=(0.10, 0.20, 0.30, 0.50),
+                        ks=(1, 3, 5, 8, 13))
+    for row in rows:
+        for cell in row["cells"]:
+            want = "{:,}".format(cell["items"])
+            assert want in text, (
+                "effect {}, k={}: README does not contain {}".format(
+                    row["effect"], cell["k"], want))
+
+
+
 # ------------------------------------------------------------ runner
 
 if __name__ == "__main__":
