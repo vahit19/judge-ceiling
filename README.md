@@ -70,6 +70,38 @@ Every number above regenerates into [`gate_results.json`](gate_results.json) and
 recomputes and diffs against a fresh run and against upstream on each push — so
 a committed figure is a claim rather than a copy-paste.
 
+## Those are the findings. This is what keeps them true
+
+The four results above are measurements. Everything below is the machinery that
+stops them rotting, and it runs on every push — a number here cannot change
+quietly.
+
+| the check | what it catches |
+|---|---|
+| `ceiling_bounds.py --self-test` | the arithmetic drifting from a worked example, before it is pointed at data |
+| **103 tests** across six files | any claim in this README becoming false; each one was confirmed by breaking the code until it failed |
+| `poison.py --check` | a committed number drifting from a fresh run of the code that produced it |
+| `fetch_consensus.py --check` | the upstream data moving under a result derived from it |
+| `fetch_leaderboard.py --check` | a published leaderboard score changing since it was saved |
+| `test_charts.py` + `git diff` on the SVGs | a figure that renders inline but not as a file, or one that no longer matches its generator |
+
+Two habits are worth naming because they are the difference between a result
+and a demo.
+
+**Numbers are regenerated, never transcribed.** Every figure quoted here comes
+out of `gate_results.json` or `consensus_panel.json`, both rebuilt and diffed in
+CI. A number nobody recomputes is a copy-paste.
+
+**The tools refuse rather than approximate.** The two-way model declines an
+unbalanced design instead of estimating one, because the approximation was
+measured at +0.30 against a true 0.45. The substitution gate declines when the
+interval runs to infinity, because the point estimate is arbitrary there. In
+both cases the tool reports what would settle the question instead of answering
+it.
+
+The whole chain — fetch, verify, compute, test, render — needs no third-party
+packages and finishes in seconds.
+
 ## Run it
 
 ```bash
