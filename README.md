@@ -1,52 +1,74 @@
 # Auditing the yardstick a judge leaderboard is scored against
 
 A judge leaderboard scores a model against human votes and treats those votes
-as ground truth. This repository asks what is known about the votes. Three
-results, each reproducible in seconds with no data, no credentials and no
+as ground truth. This repository asks what is known about the votes, and what a
+quality gate does to the answer before anyone sees it. Four results, ordered by
+how hard they are to argue with. No credentials, no private data, no
 third-party packages.
 
-**1. Every published correlation is also a statement about the raters.** Under
-classical test theory the reliability of a single human vote is at least the
-square of any correlation reported against it. On Language Stability a best
-judge of `0.7033` implies `rho_1 >= 0.4946`; on Acting, `0.2049` implies
-`>= 0.042`. The bound is tight where the board already looks strong and loose
-exactly where the interesting question is.
-[The argument](#the-argument) · `python ceiling_bounds.py`
+## 1. On someone else's published measurement, one documented parameter moves the result 38%
 
-**2. The standard quality gate raises the number it was meant to protect.** On
-rating rows with nothing wrong with them, a two-sigma outlier screen reports a
-single-rater reliability **44% above** the value the rows were built with, and
+*Towards Quantifying Benchmark Optimization in ASR Models*
+([arXiv:2608.19936](https://arxiv.org/abs/2608.19936), Apache-2.0) scores 39 ASR
+models on spans where a four-model panel flags a benchmark's reference
+transcript as contradicting the audio. A span is admitted when three of four
+panel members agree.
+
+**All 39 published scores recompute exactly** from the released data —
+numerator, denominator and ratio to four decimal places. That is the anchor,
+and it is a test rather than a sentence.
+
+Raising that one threshold to unanimity then removes **17%** of the spans and
+moves the mean score by **−38%**, because the spans the panel could not agree on
+carry a rate **4.7x** the unanimous ones. Nineteen of 35 models change rank, and
+two of the six highest are replaced — the six the paper pairs with the six best
+word error rates.
+
+Not a correction: 0.75 is a reasonable choice, stated plainly upstream, and the
+data cannot say whether a split panel marks the most diagnostic spans or the
+least trustworthy ones. The point is that the sensitivity is not published.
+[The analysis](#the-same-question-on-someone-elses-panel) ·
+`python consensus_panel.py`
+
+## 2. A standard quality gate raises the number it was meant to protect
+
+On rating rows with nothing wrong with them, a two-sigma outlier screen reports
+a single-rater reliability **44% above** the value the rows were built with, and
 the error grows monotonically as the screen is tightened. Dropping the ratings
 that disagree most with the panel does not remove error; it removes
-disagreement. A panel that genuinely needs five raters is told three are
-enough.
+disagreement. A panel that genuinely needs five raters is told three are enough.
 [The measurement](#the-gate-that-raises-the-number-it-was-meant-to-protect) ·
 `python poison.py`
 
 ![Reported reliability against screen tightness, on clean data](gate_chart.svg)
 
-**3. What a gate catches is decided by where the corruption sits, not by what
-it looks like.** Corruption concentrated inside one rater is caught 98–100% of
-the time whatever it looks like; the same quantity spread thinly is caught
-4–29%. This contradicted the hypothesis the experiment was built to test, and
-[the code says so](poison.py) rather than reporting the flattering half.
+Read the two together and the useful part is that they disagree. Tightening an
+agreement screen on **ratings** raised the reported number; tightening one on
+**items** lowered it. The direction is not fixed and is not guessable. Only the
+sensitivity generalises, which is the argument for measuring it rather than
+assuming it.
 
-**4. The same sensitivity is visible in a published measurement built on real
-data.** *Towards Quantifying Benchmark Optimization in ASR Models*
-([arXiv:2608.19936](https://arxiv.org/abs/2608.19936), Apache-2.0) scores 39 ASR
-models on spans where a four-model panel flags a benchmark's reference as
-contradicting the audio. A span is admitted when three of four panel members
-agree. All 39 published scores recompute exactly from the released data; raising
-that one documented threshold to unanimity drops **17%** of the spans and moves
-the mean score by **−38%**, because the spans the panel could not agree on carry
-a rate **4.7x** the unanimous ones. Nineteen of 35 models change rank and two of
-the six highest are replaced.
-[The analysis](#the-same-question-on-someone-elses-panel) ·
-`python consensus_panel.py`
+## 3. What a gate catches is decided by where the corruption sits, not by what it looks like
 
-Every number above regenerates into [`gate_results.json`](gate_results.json),
-which continuous integration recomputes and diffs on each push — so a
-committed figure is a claim rather than a copy-paste.
+Corruption concentrated inside one rater is caught 98–100% of the time whatever
+it looks like; the same quantity spread thinly across raters is caught 4–29%.
+This contradicted the hypothesis the experiment was built to test, and
+[the code says so](poison.py) at the top of the file rather than reporting the
+flattering half.
+
+## 4. Every published correlation is also a statement about the raters
+
+Under classical test theory the reliability of a single human vote is at least
+the square of any correlation reported against it. On Language Stability a best
+judge of `0.7033` implies `rho_1 >= 0.4946`; on Acting, `0.2049` implies
+`>= 0.042`. The bound is tight where the board already looks strong and loose
+exactly where the interesting question is.
+[The argument](#the-argument) · `python ceiling_bounds.py`
+
+Every number above regenerates into [`gate_results.json`](gate_results.json) and
+[`consensus_panel.json`](consensus_panel.json), which continuous integration
+recomputes and diffs against a fresh run and against upstream on each push — so
+a committed figure is a claim rather than a copy-paste.
 
 ## Run it
 
