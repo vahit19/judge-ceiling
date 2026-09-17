@@ -6,27 +6,19 @@ quality gate does to the answer before anyone sees it. Four results, ordered by
 how hard they are to argue with. No credentials, no private data, no
 third-party packages.
 
-## 1. On someone else's published measurement, one documented parameter moves the result 38%
+## 1. One documented parameter moves a published result by 38%
 
-*Towards Quantifying Benchmark Optimization in ASR Models*
-([arXiv:2608.19936](https://arxiv.org/abs/2608.19936), Apache-2.0) scores 39 ASR
-models on spans where a four-model panel flags a benchmark's reference
-transcript as contradicting the audio. A span is admitted when three of four
-panel members agree.
+**All 39 published scores in [arXiv:2608.19936](https://arxiv.org/abs/2608.19936)
+recompute exactly from its released data. Then moving one threshold the paper
+states — panel agreement from three-of-four to unanimous — drops the mean score
+38% and replaces two of its top six.**
 
-**All 39 published scores recompute exactly** from the released data —
-numerator, denominator and ratio to four decimal places. That is the anchor,
-and it is a test rather than a sentence.
+The spans that panel could not agree on are 17% of the item set and carry a rate
+**4.7x** the unanimous ones. Nineteen of 35 models change rank.
 
-Raising that one threshold to unanimity then removes **17%** of the spans and
-moves the mean score by **−38%**, because the spans the panel could not agree on
-carry a rate **4.7x** the unanimous ones. Nineteen of 35 models change rank, and
-two of the six highest are replaced — the six the paper pairs with the six best
-word error rates.
-
-Not a correction: 0.75 is a reasonable choice, stated plainly upstream, and the
-data cannot say whether a split panel marks the most diagnostic spans or the
-least trustworthy ones. The point is that the sensitivity is not published.
+Not a correction: three-of-four is a reasonable choice, stated plainly upstream,
+and the data cannot say whether a split panel marks the most diagnostic spans or
+the least trustworthy ones. The point is that the sensitivity is not published.
 [The analysis](METHOD.md#the-same-question-on-someone-elses-panel) ·
 `python consensus_panel.py`
 
@@ -157,6 +149,28 @@ python ceiling_bounds.py --self-test    # the mathematics self-checks alone
 
 `--check` exits non-zero if any published number has changed since the file
 was written. That is what makes the saved JSON a claim rather than a copy-paste.
+
+## Where this goes next
+
+Named because the gap between a result and its limits is the honest part of a
+small one.
+
+- **Run it on real rating rows.** Everything except result 1 is simulated. On
+  real rows the corrupted share is unknown, so the measurable quantity changes:
+  not *how much does the gate overstate*, but *how much does the reported
+  reliability move when the gate is switched off*. That needs no ground truth
+  and is the first thing to run.
+- **Sweep the screens a real pipeline actually uses** — attention checks, seeded
+  gold items, time-on-task. Each is a different selection rule on the same rows.
+- **Put a number on the consequence for a judge.** An inflated `rho_1` inflates
+  the ceiling a judge is scored against; running a simulated judge through both
+  yardsticks would replace that argument with a figure.
+- **Separate rater bias in the corrupted arms.** `poison.py` reports the one-way
+  model throughout, and rater-concentrated corruption is exactly where the
+  two-way model should matter.
+
+Longer version, with what each would settle:
+[METHOD.md](METHOD.md#what-is-not-done-yet).
 
 ## The reasoning behind the numbers
 
