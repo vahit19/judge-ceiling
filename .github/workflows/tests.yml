@@ -50,6 +50,12 @@ jobs:
       - name: Figures are loadable as files, not just inline (6 tests)
         run: python test_charts.py
 
+      - name: Someone else published scores still recompute (15 tests)
+        run: python test_consensus.py
+
+      - name: Consensus analysis invariants
+        run: python consensus_panel.py --self-test
+
       - name: The figures regenerate unchanged
         run: |
           python gate_chart.py
@@ -84,3 +90,5 @@ jobs:
           python-version: "3.11"
       - name: Saved numbers still match the live leaderboard
         run: python fetch_leaderboard.py --check
+      - name: The consensus extract still matches upstream
+        run: python fetch_consensus.py --check

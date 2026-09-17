@@ -1,0 +1,17 @@
+judge-ceiling
+
+This repository includes a derived extract of third-party material.
+
+* consensus_panel.json -- the per-model verdict matrix from
+  HumeAI/asr-benchmark-optimization, repro/data/consensus/
+  vox_en_newwl4_{samples,aggregate}.json, Copyright 2026 Hume AI,
+  licensed under the Apache License, Version 2.0.
+  https://github.com/HumeAI/asr-benchmark-optimization
+
+  Only the verdict matrix, the model list, the published scores and the
+  scoring parameters are kept; the source transcripts are not reproduced.
+  fetch_consensus.py regenerates the extract from the upstream files and
+  fetch_consensus.py --check verifies it still matches them.
+
+  Paper: Towards Quantifying Benchmark Optimization in ASR Models,
+  arXiv:2608.19936.

@@ -31,6 +31,19 @@ the time whatever it looks like; the same quantity spread thinly is caught
 4–29%. This contradicted the hypothesis the experiment was built to test, and
 [the code says so](poison.py) rather than reporting the flattering half.
 
+**4. The same sensitivity is visible in a published measurement built on real
+data.** *Towards Quantifying Benchmark Optimization in ASR Models*
+([arXiv:2608.19936](https://arxiv.org/abs/2608.19936), Apache-2.0) scores 39 ASR
+models on spans where a four-model panel flags a benchmark's reference as
+contradicting the audio. A span is admitted when three of four panel members
+agree. All 39 published scores recompute exactly from the released data; raising
+that one documented threshold to unanimity drops **17%** of the spans and moves
+the mean score by **−38%**, because the spans the panel could not agree on carry
+a rate **4.7x** the unanimous ones. Nineteen of 35 models change rank and two of
+the six highest are replaced.
+[The analysis](#the-same-question-on-someone-elses-panel) ·
+`python consensus_panel.py`
+
 Every number above regenerates into [`gate_results.json`](gate_results.json),
 which continuous integration recomputes and diffs on each push — so a
 committed figure is a claim rather than a copy-paste.
@@ -63,7 +76,13 @@ python poison.py --json        # regenerate gate_results.json
 python poison.py --check       # recompute and diff against the saved file
 python poison.py --self-test   # 17 invariants, no tables
 python gate_chart.py           # the figure (SVG)
+
+# the same question on a published panel, on real data
+python fetch_consensus.py      # public URL -> consensus_panel.json
+python fetch_consensus.py --check   # re-fetch and diff against the saved file
+python consensus_panel.py      # reproduce 39 scores, then vary the threshold
 python test_charts.py          # 6: the figures are loadable, not just inline
+python test_consensus.py       # 15: the extract, the reproduction, the sweep
 
 # tests
 python test_ceiling.py         # 15: mathematics + data integrity
@@ -206,6 +225,78 @@ wrong anywhere. The rows are simulated, which is the only way to know the
 catch rate and the collateral damage at the same time, and also the limit of
 the claim. It says what follows *if* some ratings are wrong, and what the
 standard defence does in that case.
+
+## The same question, on someone else's panel
+
+Everything above is simulated, which is the only way to know a catch rate and
+its collateral damage at once, and also the limit of the claim. This section is
+the other kind of evidence: the same question asked of a published measurement
+built from real data, where the answer is not known in advance and cannot be
+arranged.
+
+**The source.** *Towards Quantifying Benchmark Optimization in ASR Models*
+(Lebryk, Ayllon, Baird, Cłapa, Madsen and Tzirakis, arXiv:2608.19936) releases
+its reproduction data under Apache-2.0. A four-model consensus panel flags spans
+where a benchmark's reference transcript contradicts the audio; 39 ASR models
+are then scored on those spans, and ACCEPT-REF is the share on which a model
+reproduced the erroneous reference rather than the audio. A span is admitted
+when the panel agrees at `majority_pct = 0.75` — three of four.
+
+`fetch_consensus.py` pulls the two released files and keeps only the verdict
+matrix: 1,338 spans x 39 models, about 200 KB against 8 MB of source, saved as
+`consensus_panel.json` with the published scores beside it. `--check` re-fetches
+and diffs, so the saved copy is a claim about upstream rather than a snapshot
+of it.
+
+**First, the anchor.** All 39 published scores recompute from that matrix
+exactly — the numerator, the denominator and the ratio to four decimal places.
+Nothing below would mean anything without it, so it is a test rather than a
+sentence.
+
+**Then the same question this repository asks everywhere else.** The admission
+threshold is a screening rule on items, in the family `poison.py` measures on
+ratings. It is documented and it is defensible. What it costs is not published.
+
+| `majority_pct` | spans | mean ACCEPT-REF | highest |
+|---|---|---|---|
+| 0.75 (published) | 1,338 | 0.1705 | 0.3986 |
+| 1.00 (unanimity) | 1,113 | 0.1066 | 0.3179 |
+
+Requiring unanimity removes 225 spans, 17% of the set, and moves the mean score
+by −38%. The two halves explain why:
+
+| panel | spans | mean ACCEPT-REF |
+|---|---|---|
+| unanimous | 1,113 | 0.1066 |
+| split | 225 | 0.5015 |
+
+The 17% of spans the panel could not agree on carry a rate **4.7x** the
+unanimous ones. They are a small part of the item set and a large part of the
+measured effect. Nineteen of 35 models change rank between the two thresholds,
+and of the six highest-scoring models, four are the same and two are replaced —
+which matters because the paper's headline pairs the six highest ACCEPT-REF
+models with the six best word error rates.
+
+**This is not a correction.** 0.75 is a reasonable choice and the paper states
+it plainly. Nor does this settle which threshold is right, and the reason is
+interesting rather than evasive: a split panel marks an ambiguous span, and
+ambiguity reads two ways. Those spans are either the most diagnostic cases —
+exactly where a benchmark-fitted model should separate from an audio-faithful
+one — or the least trustworthy ones, where the panel itself could not hear the
+answer. The released data does not distinguish them.
+
+What it does show is the shape this repository keeps finding. In `poison.py`,
+tightening an agreement screen on *ratings* raised the reported reliability. Here,
+tightening an agreement screen on *items* lowers the reported score. The
+direction is not fixed and is not guessable; only the sensitivity is general. A
+number that moves this much with one documented parameter should travel with
+that number beside it.
+
+**What is restricted.** The sweep scores the 35 models outside the panel. Panel
+members are scored leave-one-out upstream, and the released extract carries the
+result of that rather than its inputs, so re-deriving a leave-one-out set at a
+different threshold would be guesswork. Naming the restriction is cheaper than
+having it found.
 
 ## Running this on your own rating rows
 
@@ -616,6 +707,10 @@ gate_chart.svg          the figure at the top, regenerated by gate_chart.py
 gate_results.json       every quoted number, recomputed and diffed in CI
 test_poison.py          21 tests: injection, gates, and the finding
 test_charts.py          6 tests: the figures survive being loaded as files
+fetch_consensus.py      public URL -> consensus_panel.json, with validation
+consensus_panel.json    1,338 spans x 39 models, from arXiv:2608.19936 data
+consensus_panel.py      reproduce 39 published scores, then vary their threshold
+test_consensus.py       15 tests: the extract, the reproduction, the sweep
 ```
 
 ## Continuous integration
