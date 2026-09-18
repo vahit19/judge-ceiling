@@ -30,9 +30,12 @@ model's verdict carries `rho_1 = 0.3633`. Eight models are needed to reach
 `rho_k = 0.80`.
 
 Switch on the standard rater-agreement screen, which drops raters that do not
-track the rest of the panel, and the reported reliability rises to **0.4316**,
-**+19%**, with non-overlapping intervals. But the interesting part is not the
-movement. It is **who gets removed first**:
+track the rest of the panel. At the first threshold that removes anyone
+(`min_r = 0.20`) the reported reliability rises to **0.3985**, **+9.7%**; one
+notch tighter it reaches **0.4316**, **+19%**, with intervals that no longer
+overlap the unscreened ones. But the movement is not the interesting part. At
+that first threshold the screen removes **exactly three** models, and all three
+are these:
 
 ```
 kimi-audio-7b                 consensus panel member

@@ -313,9 +313,10 @@ def report(data=None):
     print("  than error -- which is exactly what can be measured on real rows,")
     print("  and it is the smaller half of what this shows.")
     print()
-    print("  The larger half is WHO the screen removes. The first three models")
-    print("  it cuts are:")
     first = next(r for r in sw if r["cut"])
+    print(f"  The larger half is WHO it removes. At the first threshold that")
+    print(f"  cuts anyone (min_r = {first['min_r']:.2f}) it removes exactly")
+    print(f"  {len(first['cut'])} models, and they are:")
     for m in first["cut"]:
         tag = " -- consensus panel member" if m in set(data["panel"]) else ""
         print(f"    {m}{tag}")

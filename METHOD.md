@@ -217,7 +217,8 @@ The true reliability is unknown here, so this is movement rather than error —
 which is exactly the quantity that *can* be measured on real rows, and the
 smaller half of what the table shows.
 
-The larger half is who the screen removes. The first three models it cuts are
+The larger half is who the screen removes. At the first threshold that cuts
+anyone (0.20) it removes exactly three models, and they are
 `kimi-audio-7b`, `moonshine-streaming-medium` and `voxtral-mini-3b` — three of
 the four members of the consensus panel itself. They are the models that define
 what a reference error is, they follow the consensus almost always because they
