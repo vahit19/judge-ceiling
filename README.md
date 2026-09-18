@@ -2,8 +2,8 @@
 
 A judge leaderboard scores a model against human votes and treats those votes
 as ground truth. This repository asks what is known about the votes, and what a
-quality gate does to the answer before anyone sees it. Four results, ordered by
-how hard they are to argue with. No credentials, no private data, no
+quality gate does to the answer before anyone sees it. Five results, ordered by
+how hard they are to argue with. The first two are on real, published data. No credentials, no private data, no
 third-party packages.
 
 ## 1. One documented parameter moves a published result by 38%
@@ -22,7 +22,36 @@ the least trustworthy ones. The point is that the sensitivity is not published.
 [The analysis](METHOD.md#the-same-question-on-someone-elses-panel) ·
 `python consensus_panel.py`
 
-## 2. A standard quality gate raises the number it was meant to protect
+## 2. On that same real panel, an agreement screen removes the reference-setters first
+
+Read the same released data as rating rows — item is a flagged span, rater is
+one of the 39 models, score is 1 if it reproduced the reference — and a single
+model's verdict carries `rho_1 = 0.3633`. Eight models are needed to reach
+`rho_k = 0.80`.
+
+Switch on the standard rater-agreement screen, which drops raters that do not
+track the rest of the panel, and the reported reliability rises to **0.4316**,
+**+19%**, with non-overlapping intervals. But the interesting part is not the
+movement. It is **who gets removed first**:
+
+```
+kimi-audio-7b                 consensus panel member
+moonshine-streaming-medium    consensus panel member
+voxtral-mini-3b               consensus panel member
+```
+
+Those are three of the four models that **define what a reference error is**.
+They follow the consensus almost always — they wrote it — so their verdicts
+barely vary and do not track the pattern of the other thirty-six. The screen has
+no way to know that.
+
+A screen does not remove bad raters. It removes raters whose pattern differs
+from the majority, and the most authoritative rater is often the one who differs
+most.
+[The analysis](METHOD.md#the-same-question-on-someone-elses-panel) ·
+`python consensus_panel.py`
+
+## 3. A standard quality gate raises the number it was meant to protect
 
 On rating rows with nothing wrong with them, a two-sigma outlier screen reports
 a single-rater reliability **44% above** the value the rows were built with, and
@@ -40,7 +69,7 @@ agreement screen on **ratings** raised the reported number; tightening one on
 sensitivity generalises, which is the argument for measuring it rather than
 assuming it.
 
-## 3. What a gate catches is decided by where the corruption sits, not by what it looks like
+## 4. What a gate catches is decided by where the corruption sits, not by what it looks like
 
 Corruption concentrated inside one rater is caught 98–100% of the time whatever
 it looks like; the same quantity spread thinly across raters is caught 4–29%.
@@ -48,7 +77,7 @@ This contradicted the hypothesis the experiment was built to test, and
 [the code says so](poison.py) at the top of the file rather than reporting the
 flattering half.
 
-## 4. Every published correlation is also a statement about the raters
+## 5. Every published correlation is also a statement about the raters
 
 Under classical test theory the reliability of a single human vote is at least
 the square of any correlation reported against it. On Language Stability a best
@@ -64,7 +93,7 @@ a committed figure is a claim rather than a copy-paste.
 
 ## What this gives someone planning a study
 
-The four results are about a number being wrong. This is the use for getting it
+The five results are about a number being wrong. This is the use for getting it
 right: once `rho_1` is known, the two axes of an evaluation can be priced.
 
 At `rho_1 = 0.2504` — the bound the published Reliability score implies — the
@@ -79,7 +108,7 @@ items needed per arm to detect an effect, at 80% power:
 
 Reading along a row prices extra raters in items saved. Reading down a column
 prices ambition in items. Both need `rho_1` and nothing else — which is why the
-44% overstatement in result 2 is not an academic point: a gate that inflates
+44% overstatement in result 3 is not an academic point: a gate that inflates
 `rho_1` makes every cell in this table smaller than it should be, and a study
 sized from it is underpowered without anyone noticing.
 
@@ -88,14 +117,14 @@ sized from it is underpowered without anyone noticing.
 
 ## Those are the findings. This is what keeps them true
 
-The four results above are measurements. Everything below is the machinery that
+The five results above are measurements. Everything below is the machinery that
 stops them rotting, and it runs on every push — a number here cannot change
 quietly.
 
 | the check | what it catches |
 |---|---|
 | `ceiling_bounds.py --self-test` | the arithmetic drifting from a worked example, before it is pointed at data |
-| **104 tests** across six files | any claim in this README becoming false; each one was confirmed by breaking the code until it failed |
+| **109 tests** across six files | any claim in this README becoming false; each one was confirmed by breaking the code until it failed |
 | `poison.py --check` | a committed number drifting from a fresh run of the code that produced it |
 | `fetch_consensus.py --check` | the upstream data moving under a result derived from it |
 | `fetch_leaderboard.py --check` | a published leaderboard score changing since it was saved |
@@ -225,7 +254,7 @@ test_charts.py          6 tests: the figures survive being loaded as files
 fetch_consensus.py      public URL -> consensus_panel.json, with validation
 consensus_panel.json    1,338 spans x 39 models, from arXiv:2608.19936 data
 consensus_panel.py      reproduce 39 published scores, then vary their threshold
-test_consensus.py       15 tests: the extract, the reproduction, the sweep
+test_consensus.py       20 tests: the extract, the reproduction, both sweeps
 METHOD.md               the argument, both results in full, limits, refusals
 ```
 

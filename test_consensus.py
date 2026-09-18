@@ -25,8 +25,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 from consensus_panel import (  # noqa: E402
-    CONSENSUS, MISSING, REF, by_threshold, load, outside_panel, rank,
-    reproduce, scores, split_vs_unanimous, sweep)
+    CONSENSUS, MISSING, REF, as_ratings, by_threshold, load, outside_panel,
+    rank, reproduce, scores, screen_sweep, split_vs_unanimous, sweep)
 
 
 def data():
@@ -176,6 +176,63 @@ def test_the_extract_is_small_enough_to_live_in_the_repository():
     """The source is 8 MB of transcripts; only the verdict matrix is needed."""
     size = os.path.getsize(os.path.join(HERE, "consensus_panel.json"))
     assert size < 600 * 1024, f"{size / 1024:.0f} KB"
+
+
+# ------------------------------------------------- 4) THE PANEL AS RATING ROWS
+
+def test_the_ratings_view_keeps_every_answered_verdict():
+    d = data()
+    rows = as_ratings(d)
+    answered = sum(1 for r in d["runs"] for c in r["verdicts"] if c != MISSING)
+    assert len(rows) == answered, (len(rows), answered)
+    assert {r["score"] for r in rows} == {0.0, 1.0}
+    assert len({r["rater_id"] for r in rows}) == len(d["models"])
+
+
+def test_a_loose_screen_removes_nobody():
+    """If it cut raters at any threshold the sweep would measure the harness."""
+    sw = {r["min_r"]: r for r in screen_sweep(data(), thresholds=(0.05,))}
+    assert sw[0.05]["cut"] == [], sw[0.05]["cut"]
+    assert abs(sw[0.05]["move"]) < 1e-9
+
+
+def test_a_tighter_screen_raises_the_reported_reliability():
+    """
+    The real-data counterpart of the simulated result. Held to a direction and
+    a floor, not an exact value: the upstream data can be refreshed and the
+    point would still stand.
+    """
+    sw = {r["min_r"]: r for r in screen_sweep(data(), thresholds=(0.20, 0.30))}
+    base = screen_sweep(data(), thresholds=())[0]
+    assert sw[0.20]["rho_1"] > base["rho_1"]
+    assert sw[0.30]["rho_1"] > sw[0.20]["rho_1"]
+    assert sw[0.30]["move"] > 0.10, sw[0.30]["move"]
+
+
+def test_the_screen_removes_the_consensus_panel_first():
+    """
+    The finding, and the reason it is worth reporting at all. The models an
+    agreement screen cuts first are the ones that defined the consensus: their
+    verdicts barely vary, so they do not track the majority pattern. Pinned,
+    because it is the claim a reader is most likely to want to check.
+    """
+    d = data()
+    first = next(r for r in screen_sweep(d, thresholds=(0.10, 0.20, 0.30))
+                 if r["cut"])
+    panel = set(d["panel"])
+    assert first["cut"], "no threshold removed anyone"
+    assert set(first["cut"]) <= panel, (
+        f"first cut is not all panel members: {sorted(set(first['cut']) - panel)}")
+    assert len(first["cut"]) >= 3, first["cut"]
+
+
+def test_the_screened_and_unscreened_intervals_separate():
+    """Without this the movement could be read as sampling noise."""
+    sw = screen_sweep(data(), thresholds=(0.30,), resamples=300)
+    base, tight = sw[0], sw[1]
+    assert base["interval"] and tight["interval"]
+    assert tight["interval"][0] > base["interval"][1], (base["interval"],
+                                                        tight["interval"])
 
 
 # ------------------------------------------------------------ built-in runner

@@ -41,6 +41,8 @@ import json
 import os
 import sys
 
+from reliability import raters_needed
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(HERE, "consensus_panel.json")
 
@@ -130,6 +132,66 @@ def split_vs_unanimous(data):
         s = scores(data, runs, models)
         vals = [s[m]["score"] for m in models if s[m]["score"] is not None]
         out[name] = {"spans": len(runs), "mean": sum(vals) / len(vals)}
+    return out
+
+
+def as_ratings(data, runs=None):
+    """The verdict matrix as rating rows: item = span, rater = model, score =
+    1 if the model reproduced the reference and 0 if it followed the audio.
+
+    Two things this is not. The raters are models rather than people -- which
+    is the point when the question is what a panel of model judges is worth,
+    and a limitation everywhere else. And the score is binary, so the outlier
+    screen in `poison.py` has nothing to work with; a value is either 0 or 1
+    and cannot sit two standard deviations from anything. Only the rater screen
+    transfers, and only it is run below.
+    """
+    runs = data["runs"] if runs is None else runs
+    idx = {m: i for i, m in enumerate(data["models"])}
+    rows = []
+    for n, r in enumerate(runs):
+        for m in data["models"]:
+            v = r["verdicts"][idx[m]]
+            if v in (REF, CONSENSUS):
+                rows.append({"item_id": f"s{n}", "rater_id": m,
+                             "dimension": "accept_ref",
+                             "score": 1.0 if v == REF else 0.0})
+    return rows
+
+
+def screen_sweep(data, thresholds=(0.05, 0.10, 0.20, 0.30), resamples=0):
+    """What a rater-agreement screen does to this panel, and to whom.
+
+    On simulated rows the true reliability is known, so a screen that raises
+    the estimate is overstating it. Here it is not known, so the measurable
+    quantity is different and weaker: how far the reported number moves when
+    the screen is switched on. That needs no ground truth.
+
+    The identity of what gets removed is not an estimate at all, and it carries
+    more than the movement does.
+    """
+    import poison as P
+    from reliability import analyse, icc_one_way
+
+    rows = as_ratings(data)
+
+    def measure(rs):
+        if resamples:
+            a = analyse(P.to_by_item(rs), resamples=resamples, seed=1)
+            return a["rho_1"], (a["rho_1_lo"], a["rho_1_hi"])
+        out = icc_one_way(P.to_by_item(rs))
+        return (None, None) if out is None else (out[0], None)
+
+    base, base_iv = measure(rows)
+    out = [{"min_r": None, "cut": [], "rho_1": base, "interval": base_iv,
+            "move": 0.0}]
+    for mr in thresholds:
+        dropped = P.gate_rater(rows, min_r=mr)
+        cut = sorted({r["rater_id"] for r, d in zip(rows, dropped) if d})
+        kept = [r for r, d in zip(rows, dropped) if not d]
+        rho, iv = measure(kept)
+        out.append({"min_r": mr, "cut": cut, "rho_1": rho, "interval": iv,
+                    "move": rho / base - 1.0})
     return out
 
 
@@ -227,6 +289,48 @@ def report(data=None):
     print("  The paper's headline pairs the six highest accept-ref models with")
     print("  the six best word error rates. That pairing is read off an item")
     print("  set that one documented parameter reshapes.")
+    print()
+    print("=" * 78)
+    print("THE SAME PANEL, READ AS RATING ROWS")
+    print("=" * 78)
+    print("Item = flagged span, rater = model, score = 1 if it reproduced the")
+    print("reference and 0 if it followed the audio. Scores are binary, so the")
+    print("outlier screen has nothing to work with; only the rater screen runs.")
+    print()
+    sw = screen_sweep(data, resamples=300)
+    base = sw[0]
+    print(f"{'rater screen':>14s}{'cut':>6s}{'reported rho_1':>17s}"
+          f"{'95% interval':>20s}{'move':>9s}{'panel':>7s}")
+    print("-" * 78)
+    for r in sw:
+        name = "off" if r["min_r"] is None else f"min_r = {r['min_r']:.2f}"
+        iv = (f"[{r['interval'][0]:.4f}, {r['interval'][1]:.4f}]"
+              if r["interval"] else "-")
+        print(f"{name:>14s}{len(r['cut']):6d}{r['rho_1']:17.4f}{iv:>20s}"
+              f"{r['move']:+9.1%}{raters_needed(r['rho_1'], 0.80):7d}")
+    print()
+    print("  The true reliability is unknown here, so this is movement rather")
+    print("  than error -- which is exactly what can be measured on real rows,")
+    print("  and it is the smaller half of what this shows.")
+    print()
+    print("  The larger half is WHO the screen removes. The first three models")
+    print("  it cuts are:")
+    first = next(r for r in sw if r["cut"])
+    for m in first["cut"]:
+        tag = " -- consensus panel member" if m in set(data["panel"]) else ""
+        print(f"    {m}{tag}")
+    print()
+    print("  Those are the models that define what a reference error IS. They")
+    print("  follow the consensus almost always, because they wrote it, so")
+    print("  their verdicts barely vary and do not track the pattern of the")
+    print("  other thirty-six. An agreement screen has no way to know that. Run")
+    print("  blind on this panel it removes the reference-setters first, and")
+    print("  the reported reliability rises because they are gone.")
+    print()
+    print("  That is the failure mode in one sentence: a screen does not remove")
+    print("  bad raters, it removes raters whose pattern differs from the")
+    print("  majority -- and the most authoritative rater is often the one who")
+    print("  differs most.")
     print()
     print("  This is not a correction. 0.75 is a reasonable choice and the")
     print("  paper states it. But a split panel marks an ambiguous span, and")

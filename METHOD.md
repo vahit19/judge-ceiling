@@ -194,6 +194,43 @@ direction is not fixed and is not guessable; only the sensitivity is general. A
 number that moves this much with one documented parameter should travel with
 that number beside it.
 
+## The same panel, read as rating rows
+
+The verdict matrix is a rating panel: the item is a flagged span, the rater is
+one of the 39 models, and the score is 1 if the model reproduced the reference
+and 0 if it followed the audio. Two things that is not. The raters are models
+rather than people — which is the point when the question is what a panel of
+model judges is worth, and a limitation everywhere else. And the score is
+binary, so the outlier screen has nothing to work with: a value is either 0 or 1
+and cannot sit two standard deviations from anything. Only the rater screen
+transfers, and only it is run.
+
+| rater screen | cut | reported `rho_1` | 95% interval | move | panel for 0.80 |
+|---|---|---|---|---|---|
+| off | 0 | 0.3633 | [0.3435, 0.3833] | — | 8 |
+| `min_r` 0.05 | 0 | 0.3633 | [0.3435, 0.3833] | +0.0% | 8 |
+| `min_r` 0.10 | 0 | 0.3633 | [0.3435, 0.3833] | +0.0% | 8 |
+| `min_r` 0.20 | 3 | 0.3985 | [0.3760, 0.4211] | +9.7% | 7 |
+| `min_r` 0.30 | 6 | 0.4316 | [0.4083, 0.4557] | +18.8% | 6 |
+
+The true reliability is unknown here, so this is movement rather than error —
+which is exactly the quantity that *can* be measured on real rows, and the
+smaller half of what the table shows.
+
+The larger half is who the screen removes. The first three models it cuts are
+`kimi-audio-7b`, `moonshine-streaming-medium` and `voxtral-mini-3b` — three of
+the four members of the consensus panel itself. They are the models that define
+what a reference error is, they follow the consensus almost always because they
+wrote it, so their verdicts barely vary and do not track the pattern of the
+other thirty-six. An agreement screen has no way to know that.
+
+Someone will object that this is circular: of course the panel follows its own
+consensus. That is the finding rather than an objection to it. The screen is
+blind to provenance; it sees a rater whose pattern differs from the majority and
+removes it. On this panel the raters who differ most are the authoritative ones,
+and the reported reliability rises by 19% because they are gone. A screen does
+not remove bad raters. It removes unusual ones.
+
 **What is restricted.** The sweep scores the 35 models outside the panel. Panel
 members are scored leave-one-out upstream, and the released extract carries the
 result of that rather than its inputs, so re-deriving a leave-one-out set at a
