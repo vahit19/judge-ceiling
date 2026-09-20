@@ -229,6 +229,45 @@ small one.
   model throughout, and rater-concentrated corruption is exactly where the
   two-way model should matter.
 
+### The same shape in three other places
+
+Everything above measures a quantity that looks stable and is not. That shape
+recurs, and each instance is measurable with the machinery already here — a
+dose-response curve, an inert control arm, and an interval. What is missing in
+each case is access, not method, so each is stated as a design rather than a
+claim.
+
+**Long-form drift.** A voice that is correct for one sentence can become a
+different speaker over ten minutes. The measurement is not a score but a slope:
+cut the recording into windows, take a speaker embedding per window, track
+distance from the opening window, and report the slope with an interval. The
+control arm is a human recording of the same script, which drifts by whatever
+the measurement's own noise floor is. Without that arm a slope is
+uninterpretable, because embeddings wander a little even for a fixed speaker.
+
+**Reward-model rot.** A reward model trained on human ratings inherits the
+reliability of those ratings — including whatever a quality gate deleted before
+training. Two things follow and both are testable. Its ceiling is bounded by
+`rho_1`, so an inflated `rho_1` promises a reward model that cannot exist. And a
+gate that removes disagreement teaches confidence where humans were in fact
+split, which is the opposite of what a reward signal should carry into
+reinforcement learning. The experiment: train two reward models on the same
+rows, gate on and gate off, and compare calibration on held-out items where the
+panel is known to have disagreed.
+
+**Benchmark rot.** A benchmark held fixed long enough stops measuring the thing
+and starts measuring fit to itself. Held-out sets address the half where the
+benchmark is too easy to fit; result 1 here is the other half, where one
+admission parameter reshapes the item set. The open piece is the time axis:
+re-run the same audit across benchmark versions and report how much of a score
+change is capability and how much is the item set moving underneath it.
+
+**The common structure.** In all three the system is fine at one point and
+degrades along an axis — time, training, or benchmark age. A single number
+cannot show that; a curve with a control arm can. And the curve is only readable
+if the baseline's reliability is known, which is what everything above this
+section measures.
+
 Longer version, with what each would settle:
 [METHOD.md](METHOD.md#what-is-not-done-yet).
 
